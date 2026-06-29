@@ -1,10 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const ctrl = require("../controllers/facturasController");
+const ctrl = require("../controllers/productosController");
 
+router.post("/", ctrl.create);
 router.get("/", ctrl.list);
 router.get("/:id", ctrl.getById);
-router.post("/parsear-xml", ctrl.parsearXml);
-router.post("/", ctrl.create);
 
 module.exports = router;

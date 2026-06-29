@@ -2,6 +2,11 @@ require('dotenv').config();
 const express = require("express");
 const { Pool } = require("pg");
 const facturasRouter = require("./routes/facturas");
+const productosRouter = require("./routes/productos");
+const gastosRouter = require("./routes/gastos");
+const comprasRouter = require("./routes/compras");
+const inventarioRouter = require("./routes/inventario");
+const facturacionRouter = require("./routes/facturacion");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,6 +25,11 @@ app.use(express.text({ type: ["text/xml", "application/xml", "text/plain"] }));
 app.use(express.json({ type: "application/json" }));
 
 app.use("/api/facturas", facturasRouter);
+app.use("/api/productos", productosRouter);
+app.use("/api/gastos", gastosRouter);
+app.use("/api/compras", comprasRouter);
+app.use("/api/inventario", inventarioRouter);
+app.use("/api/facturacion", facturacionRouter);
 
 app.get("/health", async (req, res) => {
   try {

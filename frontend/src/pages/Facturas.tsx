@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
+import * as XLSX from "xlsx";
+import { useApi } from "../context/ApiContext";
 
 interface FacturaResumen {
   id: number;
@@ -28,93 +30,206 @@ const estadoBadge: Record<string, string> = {
   rechazada: "bg-red-100 text-red-800",
 };
 
+type SortKey = "numero_completo" | "fecha_emision" | "receptor" | "valor_a_pagar" | "estado";
+type SortDir = "asc" | "desc";
+
 export default function Facturas() {
   const [facturas, setFacturas] = useState<FacturaResumen[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [searchNumero, setSearchNumero] = useState("");
+  const [searchCliente, setSearchCliente] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("fecha_emision");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const api = useApi();
 
   useEffect(() => {
-    fetch("/api/facturas")
-      .then((res) => {
-        if (!res.ok) throw new Error("Error al cargar facturas");
-        return res.json();
-      })
-      .then((data) => setFacturas(data))
+    api.get<FacturaResumen[]>("/facturas")
+      .then(setFacturas)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [api]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const filtradas = useMemo(() => {
+    const filtered = facturas.filter((f) => {
+      const matchNumero = !searchNumero
+        || f.numero_completo.toLowerCase().includes(searchNumero.toLowerCase());
+      const matchCliente = !searchCliente
+        || f.receptor.toLowerCase().includes(searchCliente.toLowerCase());
+      return matchNumero && matchCliente;
+    });
+
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "numero_completo":
+          cmp = a.numero_completo.localeCompare(b.numero_completo);
+          break;
+        case "fecha_emision":
+          cmp = a.fecha_emision.localeCompare(b.fecha_emision);
+          break;
+        case "receptor":
+          cmp = a.receptor.localeCompare(b.receptor);
+          break;
+        case "valor_a_pagar":
+          cmp = Number(a.valor_a_pagar) - Number(b.valor_a_pagar);
+          break;
+        case "estado":
+          cmp = a.estado.localeCompare(b.estado);
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [facturas, searchNumero, searchCliente, sortKey, sortDir]);
+
+  function SortIcon({ column }: { column: SortKey }) {
+    if (sortKey !== column) return <span className="text-gray-300 ml-1">↕</span>;
+    return <span className="text-blue-600 ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  }
+
+  function exportarExcel() {
+    const data = filtradas.map((f) => ({
+      "N° Factura": f.numero_completo,
+      Fecha: new Date(f.fecha_emision).toLocaleDateString("es-CO"),
+      Cliente: f.receptor,
+      "NIT Cliente": f.nit_receptor,
+      Valor: Number(f.valor_a_pagar),
+      Estado: f.estado.replace("_", " "),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const colWidths = [
+      { wch: 18 }, { wch: 14 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 14 },
+    ];
+    ws["!cols"] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Facturas");
+    XLSX.writeFile(wb, `facturas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
 
   if (loading) return <div className="p-8 text-center text-gray-500">Cargando facturas...</div>;
   if (error) return <div className="p-8 text-center text-red-600">{error}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-800">Facturas</h1>
+    <div className="max-w-5xl">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold text-gray-800">Facturas</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportarExcel}
+            disabled={filtradas.length === 0}
+            className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Exportar Excel
+          </button>
           <Link
             to="/nueva-factura"
-            className="px-4 py-2 text-sm rounded bg-blue-600 text-white font-semibold hover:bg-blue-700"
+            className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
           >
             + Nueva
           </Link>
         </div>
-
-        {facturas.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-            No hay facturas registradas
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b text-left">
-                  <th className="p-3 font-semibold text-gray-600">N° Factura</th>
-                  <th className="p-3 font-semibold text-gray-600">Fecha</th>
-                  <th className="p-3 font-semibold text-gray-600">Cliente</th>
-                  <th className="p-3 font-semibold text-gray-600 text-right">Valor</th>
-                  <th className="p-3 font-semibold text-gray-600">Estado</th>
-                  <th className="p-3 font-semibold text-gray-600"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {facturas.map((f) => (
-                  <tr key={f.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3 font-medium">{f.numero_completo}</td>
-                    <td className="p-3 text-gray-600">
-                      {new Date(f.fecha_emision).toLocaleDateString("es-CO")}
-                    </td>
-                    <td className="p-3">
-                      <div className="font-medium">{f.receptor}</div>
-                      <div className="text-xs text-gray-500">{f.nit_receptor}</div>
-                    </td>
-                    <td className="p-3 text-right font-medium">
-                      {formatCurrency(Number(f.valor_a_pagar))}
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                          estadoBadge[f.estado] || "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {f.estado.replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <Link
-                        to={`/factura/${f.id}`}
-                        className="text-blue-600 hover:underline text-xs"
-                      >
-                        Ver
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
+
+      <div className="flex gap-3 mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por N° factura..."
+          value={searchNumero}
+          onChange={(e) => setSearchNumero(e.target.value)}
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <input
+          type="text"
+          placeholder="Buscar por cliente..."
+          value={searchCliente}
+          onChange={(e) => setSearchCliente(e.target.value)}
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+
+      {filtradas.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">
+          {facturas.length === 0
+            ? "No hay facturas registradas"
+            : "No se encontraron facturas con esos filtros"}
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b text-left">
+                <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("numero_completo")}>
+                  <span className="flex items-center gap-1">N° Factura <SortIcon column="numero_completo" /></span>
+                </th>
+                <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("fecha_emision")}>
+                  <span className="flex items-center gap-1">Fecha <SortIcon column="fecha_emision" /></span>
+                </th>
+                <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("receptor")}>
+                  <span className="flex items-center gap-1">Cliente <SortIcon column="receptor" /></span>
+                </th>
+                <th className="p-3 font-semibold text-gray-600 text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("valor_a_pagar")}>
+                  <span className="flex items-center justify-end gap-1">Valor <SortIcon column="valor_a_pagar" /></span>
+                </th>
+                <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("estado")}>
+                  <span className="flex items-center gap-1">Estado <SortIcon column="estado" /></span>
+                </th>
+                <th className="p-3 font-semibold text-gray-600"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtradas.map((f) => (
+                <tr key={f.id} className="border-b hover:bg-gray-50">
+                  <td className="p-3 font-medium">{f.numero_completo}</td>
+                  <td className="p-3 text-gray-600">
+                    {new Date(f.fecha_emision).toLocaleDateString("es-CO")}
+                  </td>
+                  <td className="p-3">
+                    <div className="font-medium">{f.receptor}</div>
+                    <div className="text-xs text-gray-500">{f.nit_receptor}</div>
+                  </td>
+                  <td className="p-3 text-right font-medium">
+                    {formatCurrency(Number(f.valor_a_pagar))}
+                  </td>
+                  <td className="p-3">
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                        estadoBadge[f.estado] || "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {f.estado.replace("_", " ")}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <Link
+                      to={`/factura/${f.id}`}
+                      className="text-blue-600 hover:underline text-xs"
+                    >
+                      Ver
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="px-3 py-2 text-xs text-gray-400 border-t">
+            {filtradas.length} de {facturas.length} facturas
+          </div>
+        </div>
+      )}
     </div>
   );
 }
