@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
-import Inicio from "./pages/Inicio";
+import Dashboard from "./pages/Dashboard";
 import Facturas from "./pages/Facturas";
 import Factura from "./pages/Factura";
 import NuevaFactura from "./pages/NuevaFactura";
@@ -24,7 +24,7 @@ function App() {
         <DashboardProvider>
           <Layout>
             <Routes>
-              <Route path="/" element={<Inicio />} />
+              <Route path="/" element={<Dashboard />} />
               <Route path="/facturas" element={<Facturas />} />
               <Route path="/factura/:id" element={<Factura />} />
               <Route path="/nueva-factura" element={<NuevaFactura />} />

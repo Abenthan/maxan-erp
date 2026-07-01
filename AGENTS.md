@@ -4,7 +4,25 @@
 - Sistema de facturación electrónica DIAN UBL 2.1 funcional
 - Backend: Node.js + Express 5 + PostgreSQL (pg, sin ORM) en puerto 3000
 - Frontend: React 19 + TypeScript 6 + Tailwind CSS 4 + Vite 8
-- UI: Sidebar lateral + header (Layout.tsx), Tailwind puro (sin librerías de componentes)
+- UI: Sidebar lateral con grupos (VENTAS azul, COSTOS naranja, INVENTARIO verde) + header, Tailwind puro
+- BD vacía (todos los registros borrados)
+
+## Sidebar (Layout.tsx)
+```
+📊 Dashboard
+── VENTAS ──        (bg-blue-50)
+  📄 Facturación
+  📋 Ventas Items
+  ➕ Nueva Venta
+── COSTOS ──        (bg-orange-50)
+  📥 Compras
+  💰 Gastos
+── INVENTARIO ──    (bg-emerald-50)
+  📦 Productos
+  📊 Stock
+  🔄 Movimientos
+📈 Utilidad
+```
 
 ## Módulo facturación (NO MODIFICAR)
 - Backend: `routes/facturas.js` — CRUD completo + parseo XML
@@ -18,23 +36,26 @@
   - Al guardar una compra, por cada línea crea un gasto en `gastos.gastos` y por cada impuesto (>0) crea un gasto adicional distribuido proporcionalmente según `item.valor_linea / subtotal_total`
 - **Inventario** — `routes/inventario.js` → `GET /api/inventario/stock`, `GET /api/inventario/movimientos/:producto_id`, `POST /api/inventario/consumir` (FIFO transaccional)
 - **Ventas** — `routes/ventas.js` → `GET /api/ventas/items`, `PUT /api/ventas/items/:id` (asignar producto_id), `POST /api/ventas` (crear)
-- **Utilidad** — `routes/facturacion.js` → `GET /api/facturacion/:factura_id/utilidad`
+- **Utilidad** — `routes/facturacion.js` → `GET /api/facturacion/:factura_id/utilidad`, `GET /api/facturacion/utilidad/productos`
 - **Categorías** — `routes/categorias.js` → `GET/POST/DELETE /api/productos/categorias` (maestro de categorías)
+- **Dashboard** — `routes/dashboard.js` → `GET /api/dashboard` con filtros `?mes=&cliente_id=&factura_id=`
+  - Retorna: resumen, ventas_por_mes, gastos_por_mes, gastos_por_clasificacion, top_clientes, ultimas_facturas, clientes, productos_utilidad
 
 ## Frontend módulos (implementados)
-- `components/Layout.tsx` — Sidebar + header, navegación a todos los módulos
-- `pages/Inicio.tsx` — Dashboard con tarjetas de módulos y estado BD
-- `pages/Productos.tsx` — Listado de catálogo
-- `pages/Gastos.tsx` — Listado con filtros (descripción + rango fechas + producto_id por URL), scroll vertical, fila clickeable para editar en el formulario inferior, formulario integrado para crear/editar gastos, Ctrl+G shortcut, quick-create product modal
+- `pages/Dashboard.tsx` — Página principal `/` con cards de resumen, barras ventas/gastos/clasificación, top clientes, últimas facturas, utilidad por producto. Filtros: mes (select últimos 12 meses), cliente, factura ID.
+- `pages/Productos.tsx` — Listado de catálogo con filtros (búsqueda + categoría), tabla, formulario crear/editar abajo, links a Stock y Gastos
+- `pages/Gastos.tsx` — Listado con filtros (descripción + rango fechas + producto_id por URL), scroll vertical, fila clickeable para editar en formulario inferior, formulario integrado crear/editar, Ctrl+G shortcut, quick-create product modal con checkbox inventariable
 - `pages/Compras.tsx` — Listado de facturas compra
 - `pages/NuevaCompra.tsx` — Subir XML de compra con preview + botón guardar (paso doble: parsear → mostrar → guardar)
 - `pages/Inventario.tsx` — Stock desde `vw_stock_disponible`
-- `pages/VentasItems.tsx` — Items de venta con filtros, asignación de producto + botón consumir stock
-- `context/ApiContext.tsx` — Tiene métodos: `get`, `post`, `put`, `del`, `postXml`, `upload`
+- `pages/VentasItems.tsx` — Items de venta con filtros, dropdown de producto por fila + botón Consumir stock (PUT item + POST consumir), badge "Consumido"
+- `pages/Utilidad.tsx` — Dos tabs: Por Producto (tabla desde vw_utilidad_productos) y Por Factura (input ID + resumen + detalle líneas)
+- `context/ApiContext.tsx` — Métodos: `get`, `post`, `put`, `del`, `postXml`, `upload`
 
 ## Schemas SQL
 - `db/01_schema.sql` — Schema `facturacion` (aplicado)
 - `db/02_compras_gastos_inventario.sql` — Schemas `compras`, `inventario`, `gastos` con tablas, triggers, vistas (`vw_stock_disponible`, `vw_utilidad_items`, `vw_utilidad_productos`) — **YA aplicado**
+- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`
 
 ## Dependencias adicionales
 - `multer` (upload XML en compras)
@@ -76,6 +97,9 @@ cd frontend && npm run dev
 
 # Consultar BD
 docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp
+
+# Limpiar BD
+docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp -c "TRUNCATE TABLE facturacion.factura_archivos, facturacion.factura_impuestos, facturacion.factura_respuestas_dian, facturacion.ventas_items, facturacion.ventas, facturacion.terceros, compras.facturas_compra_archivos, compras.facturas_compra, gastos.gastos, inventario.salida_detalle, inventario.salidas, inventario.entradas, inventario.productos, inventario.categorias CASCADE;"
 ```
 
 ## Conexión BD

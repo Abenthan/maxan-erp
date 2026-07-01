@@ -9,6 +9,7 @@ const inventarioRouter = require("./routes/inventario");
 const facturacionRouter = require("./routes/facturacion");
 const ventasRouter = require("./routes/ventas");
 const categoriasRouter = require("./routes/categorias");
+const dashboardRouter = require("./routes/dashboard");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +35,7 @@ app.use("/api/compras", comprasRouter);
 app.use("/api/inventario", inventarioRouter);
 app.use("/api/facturacion", facturacionRouter);
 app.use("/api/ventas", ventasRouter);
+app.use("/api/dashboard", dashboardRouter);
 
 app.get("/health", async (req, res) => {
   try {
