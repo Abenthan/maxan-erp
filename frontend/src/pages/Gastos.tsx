@@ -1,7 +1,14 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
 
 interface Producto {
+  id: number;
+  codigo: string;
+  nombre: string;
+}
+
+interface Categoria {
   id: number;
   nombre: string;
 }
@@ -16,6 +23,7 @@ interface Gasto {
   fecha: string;
   factura_compra_id: number | null;
   producto_id: number | null;
+  codigo_producto: string | null;
 }
 
 function formatCurrency(n: number): string {
@@ -30,8 +38,12 @@ const clasifBadge: Record<string, string> = {
 
 export default function Gestos() {
   const api = useApi();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filtroProductoId = searchParams.get("producto_id") || "";
+  const filtroProductoNombre = searchParams.get("nombre") || "";
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -46,18 +58,31 @@ export default function Gestos() {
   const [vrUnit, setVrUnit] = useState("");
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [productoId, setProductoId] = useState("");
+  const [codigoProducto, setCodigoProducto] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [sortFechaAsc, setSortFechaAsc] = useState(false);
+
+  const [showModal, setShowModal] = useState(false);
+  const [prodCodigo, setProdCodigo] = useState("");
+  const [prodNombre, setProdNombre] = useState("");
+  const [prodCategoria, setProdCategoria] = useState("");
+  const [prodUnidad, setProdUnidad] = useState("UND");
+  const [prodInventariable, setProdInventariable] = useState(true);
+  const [creandoProducto, setCreandoProducto] = useState(false);
 
   const cargar = useCallback(() => {
     setLoading(true);
+    const params: Record<string, string> = {};
+    if (filtroProductoId) params.producto_id = filtroProductoId;
     Promise.all([
-      api.get<Gasto[]>("/gastos"),
+      api.get<Gasto[]>("/gastos", params),
       api.get<Producto[]>("/productos"),
+      api.get<Categoria[]>("/productos/categorias"),
     ])
-      .then(([g, p]) => { setGastos(g); setProductos(p); })
+      .then(([g, p, c]) => { setGastos(g); setProductos(p); setCategorias(c); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [api]);
+  }, [api, filtroProductoId]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -69,17 +94,22 @@ export default function Gestos() {
     setVrUnit("");
     setFecha(new Date().toISOString().slice(0, 10));
     setProductoId("");
+    setCodigoProducto("");
   }
 
   const filtrados = useMemo(() => {
-    return gastos.filter((g) => {
+    const filtrados = gastos.filter((g) => {
       const matchDesc = !filtroDesc
         || g.descripcion.toLowerCase().includes(filtroDesc.toLowerCase());
       const matchDesde = !filtroFechaDesde || g.fecha >= filtroFechaDesde;
       const matchHasta = !filtroFechaHasta || g.fecha <= filtroFechaHasta;
       return matchDesc && matchDesde && matchHasta;
     });
-  }, [gastos, filtroDesc, filtroFechaDesde, filtroFechaHasta]);
+    return filtrados.sort((a, b) => {
+      const cmp = a.fecha.localeCompare(b.fecha);
+      return sortFechaAsc ? cmp : -cmp;
+    });
+  }, [gastos, filtroDesc, filtroFechaDesde, filtroFechaHasta, sortFechaAsc]);
 
   const totalCalculado = useMemo(() => {
     const c = parseFloat(cant) || 0;
@@ -95,6 +125,7 @@ export default function Gestos() {
     setVrUnit(g.valor_unitario);
     setFecha(g.fecha.slice(0, 10));
     setProductoId(g.producto_id ? String(g.producto_id) : "");
+    setCodigoProducto(g.codigo_producto || "");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -127,6 +158,30 @@ export default function Gestos() {
       setError(err instanceof Error ? err.message : "Error al guardar");
     } finally {
       setGuardando(false);
+    }
+  }
+
+  async function handleQuickCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!prodCodigo.trim() || !prodNombre.trim()) return;
+    setCreandoProducto(true);
+    setError("");
+    try {
+      const nuevo = await api.post<Producto>("/productos", {
+        codigo: prodCodigo.trim(),
+        nombre: prodNombre.trim(),
+        categoria: prodCategoria || undefined,
+        unidad_medida: prodUnidad,
+        inventariable: prodInventariable,
+      });
+      const actualizados = [...productos, nuevo].sort((a, b) => a.nombre.localeCompare(b.nombre));
+      setProductos(actualizados);
+      setProductoId(String(nuevo.id));
+      setShowModal(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error al crear producto");
+    } finally {
+      setCreandoProducto(false);
     }
   }
 
@@ -170,15 +225,28 @@ export default function Gestos() {
               className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          {(filtroDesc || filtroFechaDesde || filtroFechaHasta) && (
+          {(filtroDesc || filtroFechaDesde || filtroFechaHasta || filtroProductoId) && (
             <button
-              onClick={() => { setFiltroDesc(""); setFiltroFechaDesde(""); setFiltroFechaHasta(""); }}
+              onClick={() => { setFiltroDesc(""); setFiltroFechaDesde(""); setFiltroFechaHasta(""); setSearchParams({}); }}
               className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
             >
               Limpiar
             </button>
           )}
         </div>
+        {filtroProductoId && (
+          <div className="mt-3">
+            <span className="inline-flex items-center gap-1 px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-800">
+              Gastos de: {filtroProductoNombre || `Producto #${filtroProductoId}`}
+              <button
+                onClick={() => setSearchParams({})}
+                className="ml-1 text-blue-600 hover:text-blue-800 font-bold"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8">
@@ -192,7 +260,9 @@ export default function Gestos() {
                 <th className="p-3 font-semibold text-gray-600">Cantidad</th>
                 <th className="p-3 font-semibold text-gray-600 text-right">Vr Unitario</th>
                 <th className="p-3 font-semibold text-gray-600 text-right">Total</th>
-                <th className="p-3 font-semibold text-gray-600">Fecha</th>
+                <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none hover:text-gray-900" onClick={() => setSortFechaAsc((p) => !p)}>
+                  Fecha <span className="text-blue-600 ml-1">{sortFechaAsc ? "↑" : "↓"}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -221,7 +291,7 @@ export default function Gestos() {
                           </span>
                         )}
                       </td>
-                      <td className="p-3 text-sm">{prod ? prod.nombre : "-"}</td>
+                      <td className="p-3 text-sm">{prod ? prod.nombre : g.codigo_producto ? `[${g.codigo_producto}]` : "-"}</td>
                       <td className="p-3 text-gray-600">{g.cantidad}</td>
                       <td className="p-3 text-right">{formatCurrency(Number(g.valor_unitario))}</td>
                       <td className="p-3 text-right font-medium">{formatCurrency(Number(g.valor_total))}</td>
@@ -239,55 +309,26 @@ export default function Gestos() {
         <h2 className="text-lg font-semibold text-gray-800 mb-4">
           {editId ? "Editar Gasto" : "Nuevo Gasto"}
         </h2>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Fecha</label>
+            <input
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
           <div className="lg:col-span-2">
             <label className="block text-xs font-medium text-gray-500 mb-1">Descripción *</label>
             <input
               type="text"
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
+              onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
               required
               placeholder="Ej: Servicio de mensajería"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Producto (opcional)</label>
-            <select
-              value={productoId}
-              onChange={(e) => {
-                setProductoId(e.target.value);
-                if (e.target.value) setClasif("Operacional");
-              }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- Ninguno --</option>
-              {productos.filter((p) => p.id).map((p) => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Clasificación</label>
-            <select
-              value={clasif}
-              onChange={(e) => setClasif(e.target.value)}
-              disabled={!!productoId}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:text-gray-400"
-            >
-              <option value="Operacional">Operacional</option>
-              <option value="Administrativo">Administrativo</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Cantidad</label>
-            <input
-              type="number"
-              step="any"
-              min="0.01"
-              value={cant}
-              onChange={(e) => setCant(e.target.value)}
-              required
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -299,24 +340,69 @@ export default function Gestos() {
               min="0.01"
               value={vrUnit}
               onChange={(e) => setVrUnit(e.target.value)}
+              onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
               required
               placeholder="0.00"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Fecha</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Cantidad</label>
             <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
+              type="number"
+              step="any"
+              min="0.01"
+              value={cant}
+              onChange={(e) => setCant(e.target.value)}
+              onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
+              required
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div className="lg:col-span-2">
+          <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Total (auto)</label>
             <div className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700 font-medium">
               {formatCurrency(totalCalculado)}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Clasificación</label>
+            <select
+              value={clasif}
+              onChange={(e) => setClasif(e.target.value)}
+              onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
+              disabled={!!productoId}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              <option value="Operacional">Operacional</option>
+              <option value="Administrativo">Administrativo</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Producto (opcional)</label>
+            <div className="flex gap-1">
+              <select
+                value={productoId}
+                onChange={(e) => {
+                  setProductoId(e.target.value);
+                  if (e.target.value) setClasif("Operacional");
+                }}
+                onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
+              >
+                <option value="">-- Ninguno --</option>
+                {productos.filter((p) => p.id).map((p) => (
+                  <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => { setProdCodigo(codigoProducto); setProdNombre(desc); setProdCategoria(""); setProdUnidad("UND"); setProdInventariable(true); setShowModal(true); }}
+                title="Crear producto rápido"
+                className="px-2.5 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600 shrink-0"
+              >
+                +
+              </button>
             </div>
           </div>
           <div className="lg:col-span-4 flex justify-end gap-3">
@@ -330,15 +416,104 @@ export default function Gestos() {
               </button>
             )}
             <button
+              id="guardar-gasto"
               type="submit"
               disabled={guardando || !desc.trim() || !vrUnit}
               className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
             >
-              {guardando ? "Guardando..." : editId ? "Actualizar Gasto" : "Guardar Gasto"}
+              {guardando ? "Guardando..." : editId ? "Actualizar Gasto" : "Guardar Gasto"} <span className="text-blue-200 text-xs ml-1">Ctrl+G</span>
             </button>
           </div>
         </form>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowModal(false)}>
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Nuevo Producto Rápido</h3>
+            <form onSubmit={handleQuickCreate} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Código *</label>
+                <input
+                  type="text"
+                  value={prodCodigo}
+                  onChange={(e) => setProdCodigo(e.target.value)}
+                  required
+                  placeholder="Ej: PROD-001"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Nombre *</label>
+                <input
+                  type="text"
+                  value={prodNombre}
+                  onChange={(e) => setProdNombre(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
+                <select
+                  value={prodCategoria}
+                  onChange={(e) => setProdCategoria(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Sin categoría --</option>
+                  {categorias.map((c) => (
+                    <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Unidad</label>
+                <select
+                  value={prodUnidad}
+                  onChange={(e) => setProdUnidad(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="UND">Unidad (UND)</option>
+                  <option value="NIU">Pieza (NIU)</option>
+                  <option value="KGM">Kilogramo (KGM)</option>
+                  <option value="LTR">Litro (LTR)</option>
+                  <option value="MTR">Metro (MTR)</option>
+                  <option value="MTK">Metro cuadrado (MTK)</option>
+                  <option value="HUR">Hora (HUR)</option>
+                  <option value="DAY">Día (DAY)</option>
+                  <option value="MON">Mes (MON)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="prodInventariable"
+                  checked={prodInventariable}
+                  onChange={(e) => setProdInventariable(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="prodInventariable" className="text-sm text-gray-700">Inventariable</label>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creandoProducto || !prodCodigo.trim() || !prodNombre.trim()}
+                  className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {creandoProducto ? "Creando..." : "Crear Producto"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

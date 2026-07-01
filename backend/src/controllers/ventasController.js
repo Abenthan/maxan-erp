@@ -9,10 +9,12 @@ async function listItems(req, res) {
   try {
     let sql = `
       SELECT vi.*, v.numero_completo, v.fecha_emision,
-             t.razon_social AS cliente, t.numero_documento AS nit_cliente
+             t.razon_social AS cliente, t.numero_documento AS nit_cliente,
+             CASE WHEN s.id IS NOT NULL THEN true ELSE false END AS consumido
       FROM facturacion.ventas_items vi
       JOIN facturacion.ventas v ON v.id = vi.venta_id
       LEFT JOIN facturacion.terceros t ON t.id = v.receptor_id
+      LEFT JOIN inventario.salidas s ON s.factura_item_id = vi.id
       WHERE 1=1`;
     const params = [];
     let idx = 1;
@@ -40,6 +42,32 @@ async function listItems(req, res) {
     res.json(result.rows);
   } catch (error) {
     console.error("Error al listar items de venta:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function updateItem(req, res) {
+  const pool = getPool(req);
+  const { id } = req.params;
+  const { producto_id } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE facturacion.ventas_items
+       SET producto_id = $1
+       WHERE id = $2
+       RETURNING *`,
+      [producto_id || null, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Item de venta no encontrado" });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23503') {
+      return res.status(400).json({ error: "El producto especificado no existe" });
+    }
+    console.error("Error al actualizar item de venta:", error.message);
     res.status(500).json({ error: error.message });
   }
 }
@@ -154,4 +182,4 @@ async function create(req, res) {
   }
 }
 
-module.exports = { listItems, create };
+module.exports = { listItems, create, updateItem };

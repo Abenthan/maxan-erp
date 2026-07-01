@@ -116,9 +116,9 @@ async function upload(req, res) {
 
       const gastoQ = `
         INSERT INTO gastos.gastos
-          (factura_compra_id, proveedor_id, descripcion,
+          (factura_compra_id, proveedor_id, descripcion, codigo_producto,
            clasificacion, cantidad, valor_unitario, valor_total, fecha, producto_id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
         RETURNING id`;
 
       for (const item of data.items) {
@@ -127,6 +127,7 @@ async function upload(req, res) {
           facturaCompraId,
           proveedorId,
           item.descripcion || "Sin descripción",
+          item.codigo_producto || null,
           prodId ? "Suministros" : "Operacional",
           item.cantidad || 1,
           item.valor_unitario || 0,

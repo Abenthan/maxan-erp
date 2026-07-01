@@ -8,6 +8,7 @@ const comprasRouter = require("./routes/compras");
 const inventarioRouter = require("./routes/inventario");
 const facturacionRouter = require("./routes/facturacion");
 const ventasRouter = require("./routes/ventas");
+const categoriasRouter = require("./routes/categorias");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,7 @@ app.use(express.text({ type: ["text/xml", "application/xml", "text/plain"] }));
 app.use(express.json({ type: "application/json" }));
 
 app.use("/api/facturas", facturasRouter);
+app.use("/api/productos/categorias", categoriasRouter);
 app.use("/api/productos", productosRouter);
 app.use("/api/gastos", gastosRouter);
 app.use("/api/compras", comprasRouter);

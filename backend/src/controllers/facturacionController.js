@@ -19,7 +19,7 @@ async function utilidad(req, res) {
     const utilidadResult = await pool.query(
       `SELECT v.*
        FROM facturacion.vw_utilidad_items v
-       JOIN facturacion.ventas_items fi ON fi.id = v.factura_item_id
+       JOIN facturacion.ventas_items fi ON fi.id = v.venta_item_id
        WHERE fi.venta_id = $1
        ORDER BY fi.numero_linea`,
       [factura_id]
@@ -50,4 +50,16 @@ async function utilidad(req, res) {
   }
 }
 
-module.exports = { utilidad };
+async function utilidadProductos(req, res) {
+  const pool = getPool(req);
+  try {
+    const result = await pool.query(
+      "SELECT * FROM inventario.vw_utilidad_productos ORDER BY nombre"
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al consultar utilidad por productos:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+module.exports = { utilidad, utilidadProductos };

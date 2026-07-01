@@ -97,7 +97,7 @@ async function create(req, res) {
 
 async function list(req, res) {
   const pool = getPool(req);
-  const { factura_compra_id, clasificacion, fecha_desde, fecha_hasta } = req.query;
+  const { factura_compra_id, producto_id, clasificacion, fecha_desde, fecha_hasta } = req.query;
 
   try {
     let sql = "SELECT * FROM gastos.gastos WHERE 1=1";
@@ -107,6 +107,10 @@ async function list(req, res) {
     if (factura_compra_id) {
       sql += ` AND factura_compra_id = $${idx++}`;
       params.push(factura_compra_id);
+    }
+    if (producto_id) {
+      sql += ` AND producto_id = $${idx++}`;
+      params.push(producto_id);
     }
     if (clasificacion) {
       sql += ` AND clasificacion = $${idx++}`;

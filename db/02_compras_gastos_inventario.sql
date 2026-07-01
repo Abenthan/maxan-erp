@@ -58,6 +58,7 @@ CREATE TABLE compras.facturas_compra_archivos (
 -- ---------------------------------------------------------------------
 CREATE TABLE inventario.productos (
     id              SERIAL PRIMARY KEY,
+    codigo          VARCHAR(50) NOT NULL UNIQUE,
     nombre          VARCHAR(255) NOT NULL,
     categoria       VARCHAR(100),              -- "Equipos de Cómputo", "Insumos de Impresión", etc.
     inventariable   BOOLEAN NOT NULL DEFAULT TRUE,  -- ¿afecta stock o es activo interno?
@@ -71,7 +72,16 @@ CREATE TRIGGER trg_productos_updated_at
     FOR EACH ROW EXECUTE FUNCTION facturacion.fn_set_updated_at();
 
 -- ---------------------------------------------------------------------
--- 3. GASTOS: cada línea de compra (con o sin factura formal) es un gasto
+-- 3. CATEGORÍAS DE PRODUCTOS (maestro)
+-- ---------------------------------------------------------------------
+CREATE TABLE inventario.categorias (
+    id          SERIAL PRIMARY KEY,
+    nombre      VARCHAR(100) NOT NULL UNIQUE,
+    created_at  TIMESTAMP DEFAULT now()
+);
+
+-- ---------------------------------------------------------------------
+-- 4. GASTOS: cada línea de compra (con o sin factura formal) es un gasto
 -- ---------------------------------------------------------------------
 CREATE TABLE gastos.gastos (
     id                  SERIAL PRIMARY KEY,
@@ -80,7 +90,9 @@ CREATE TABLE gastos.gastos (
     proveedor_id        INT REFERENCES facturacion.terceros(id),                      -- opcional si es informal
 
     producto_id         INT REFERENCES inventario.productos(id),     -- si es físico revendible
-    venta_item_id        INT REFERENCES facturacion.factura_items(id), -- asignación directa (solo si producto_id IS NULL)
+    venta_item_id        INT REFERENCES facturacion.ventas_items(id), -- asignación directa (solo si producto_id IS NULL)
+
+    codigo_producto      VARCHAR(50),                                  -- código del producto en el sistema del proveedor
 
     descripcion          TEXT NOT NULL,
     clasificacion         VARCHAR(20) NOT NULL
@@ -124,7 +136,7 @@ CREATE TRIGGER trg_gastos_set_clasificacion
     FOR EACH ROW EXECUTE FUNCTION gastos.fn_set_clasificacion();
 
 -- ---------------------------------------------------------------------
--- 4. INVENTARIO: entradas (stock comprado) y salidas (stock vendido, FIFO)
+-- 5. INVENTARIO: entradas (stock comprado) y salidas (stock vendido, FIFO)
 -- ---------------------------------------------------------------------
 CREATE TABLE inventario.entradas (
     id                  SERIAL PRIMARY KEY,
@@ -139,31 +151,45 @@ CREATE TABLE inventario.entradas (
 
 CREATE INDEX idx_entradas_producto_fecha ON inventario.entradas(producto_id, fecha, id);
 
--- Auto-crear entrada de inventario cuando el gasto es de un producto inventariable
+-- Auto-crear/actualizar entrada de inventario cuando el gasto tiene un producto inventariable y es Suministros
 CREATE OR REPLACE FUNCTION inventario.fn_crear_entrada()
 RETURNS TRIGGER AS $$
 DECLARE
     v_inventariable BOOLEAN;
+    v_entrada_id INT;
 BEGIN
-    IF NEW.producto_id IS NOT NULL THEN
+    IF NEW.producto_id IS NOT NULL AND NEW.clasificacion = 'Suministros' THEN
         SELECT inventariable INTO v_inventariable FROM inventario.productos WHERE id = NEW.producto_id;
         IF v_inventariable THEN
-            INSERT INTO inventario.entradas (gasto_id, producto_id, cantidad, cantidad_disponible, costo_unitario, fecha)
-            VALUES (NEW.id, NEW.producto_id, NEW.cantidad, NEW.cantidad, NEW.valor_unitario, NEW.fecha);
+            SELECT id INTO v_entrada_id FROM inventario.entradas WHERE gasto_id = NEW.id;
+            IF NOT FOUND THEN
+                INSERT INTO inventario.entradas (gasto_id, producto_id, cantidad, cantidad_disponible, costo_unitario, fecha)
+                VALUES (NEW.id, NEW.producto_id, NEW.cantidad, NEW.cantidad, NEW.valor_unitario, NEW.fecha);
+            ELSE
+                UPDATE inventario.entradas
+                SET producto_id = NEW.producto_id,
+                    cantidad = NEW.cantidad,
+                    cantidad_disponible = NEW.cantidad,
+                    costo_unitario = NEW.valor_unitario,
+                    fecha = NEW.fecha
+                WHERE id = v_entrada_id;
+            END IF;
         END IF;
+    ELSE
+        DELETE FROM inventario.entradas WHERE gasto_id = NEW.id;
     END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_gastos_crear_entrada
-    AFTER INSERT ON gastos.gastos
+    AFTER INSERT OR UPDATE OF producto_id ON gastos.gastos
     FOR EACH ROW EXECUTE FUNCTION inventario.fn_crear_entrada();
 
 -- Salidas: consumo de inventario al vender (cabecera)
 CREATE TABLE inventario.salidas (
     id               SERIAL PRIMARY KEY,
-    factura_item_id  INT NOT NULL REFERENCES facturacion.factura_items(id) ON DELETE CASCADE,
+    factura_item_id  INT NOT NULL REFERENCES facturacion.ventas_items(id) ON DELETE CASCADE,
     producto_id      INT NOT NULL REFERENCES inventario.productos(id),
     cantidad          NUMERIC(18,6) NOT NULL,
     costo_total        NUMERIC(18,2) NOT NULL,
@@ -180,7 +206,7 @@ CREATE TABLE inventario.salida_detalle (
 );
 
 -- ---------------------------------------------------------------------
--- 5. VISTAS DE CONSULTA
+-- 6. VISTAS DE CONSULTA
 -- ---------------------------------------------------------------------
 
 -- Stock actual por producto
@@ -198,13 +224,14 @@ GROUP BY p.id, p.nombre, p.categoria;
 -- Utilidad por línea de venta (combina costo de inventario + costo directo de servicios)
 CREATE OR REPLACE VIEW facturacion.vw_utilidad_items AS
 SELECT
-    fi.id AS factura_item_id,
+    fi.id AS venta_item_id,
     fi.descripcion,
     fi.valor_linea,
+    fi.producto_id,
     COALESCE(sal.costo_inventario, 0) AS costo_inventario,
     COALESCE(gd.costo_directo, 0)     AS costo_directo,
     fi.valor_linea - COALESCE(sal.costo_inventario, 0) - COALESCE(gd.costo_directo, 0) AS utilidad
-FROM facturacion.factura_items fi
+FROM facturacion.ventas_items fi
 LEFT JOIN (
     SELECT factura_item_id, SUM(costo_total) AS costo_inventario
     FROM inventario.salidas GROUP BY factura_item_id
@@ -214,7 +241,38 @@ LEFT JOIN (
     FROM gastos.gastos WHERE venta_item_id IS NOT NULL GROUP BY venta_item_id
 ) gd ON gd.venta_item_id = fi.id;
 
+-- Utilidad (ingresos - costos) por producto
+CREATE OR REPLACE VIEW inventario.vw_utilidad_productos AS
+SELECT
+    p.id AS producto_id,
+    p.codigo,
+    p.nombre,
+    p.categoria,
+    COALESCE(compras.costo_adquisiciones, 0) AS costo_adquisiciones,
+    COALESCE(ventas.ingreso_ventas, 0) AS ingreso_ventas,
+    COALESCE(gastos_extra.otros_costos, 0) AS otros_costos,
+    COALESCE(ventas.ingreso_ventas, 0) - COALESCE(compras.costo_adquisiciones, 0) - COALESCE(gastos_extra.otros_costos, 0) AS utilidad
+FROM inventario.productos p
+LEFT JOIN (
+    SELECT e.producto_id, SUM(e.cantidad * e.costo_unitario) AS costo_adquisiciones
+    FROM inventario.entradas e
+    GROUP BY e.producto_id
+) compras ON compras.producto_id = p.id
+LEFT JOIN (
+    SELECT s.producto_id, SUM(vi.valor_linea) AS ingreso_ventas
+    FROM inventario.salidas s
+    JOIN facturacion.ventas_items vi ON vi.id = s.factura_item_id
+    GROUP BY s.producto_id
+) ventas ON ventas.producto_id = p.id
+LEFT JOIN (
+    SELECT g.producto_id, SUM(g.valor_total) AS otros_costos
+    FROM gastos.gastos g
+    WHERE g.producto_id IS NOT NULL AND g.venta_item_id IS NULL AND g.clasificacion <> 'Suministros'
+    GROUP BY g.producto_id
+) gastos_extra ON gastos_extra.producto_id = p.id
+ORDER BY p.nombre;
+
 -- ---------------------------------------------------------------------
--- 6. search_path actualizado
+-- 8. search_path actualizado
 -- ---------------------------------------------------------------------
 ALTER ROLE maxan_user SET search_path TO facturacion, compras, inventario, gastos, public;

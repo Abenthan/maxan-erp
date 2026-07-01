@@ -13,6 +13,7 @@ import NuevaVenta from "./pages/NuevaVenta";
 import VentasItems from "./pages/VentasItems";
 import Inventario from "./pages/Inventario";
 import MovimientosInventario from "./pages/MovimientosInventario";
+import Utilidad from "./pages/Utilidad";
 import { ApiProvider } from "./context/ApiContext";
 import { DashboardProvider } from "./context/DashboardContext";
 
@@ -36,6 +37,7 @@ function App() {
               <Route path="/ventas-items" element={<VentasItems />} />
               <Route path="/inventario" element={<Inventario />} />
               <Route path="/inventario/movimientos" element={<MovimientosInventario />} />
+              <Route path="/utilidad" element={<Utilidad />} />
             </Routes>
           </Layout>
         </DashboardProvider>
