@@ -1,6 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
+
+interface Producto {
+  id: number;
+  nombre: string;
+}
 
 interface Tercero {
   tipo_documento: string;
@@ -71,6 +76,18 @@ export default function NuevaCompra() {
   const [error, setError] = useState("");
   const [data, setData] = useState<CompraData | null>(null);
   const [guardado, setGuardado] = useState(false);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [productoMap, setProductoMap] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    api.get<Producto[]>("/productos")
+      .then(setProductos)
+      .catch(() => {});
+  }, [api]);
+
+  function setProductoForLinea(numeroLinea: number, productoId: string) {
+    setProductoMap((prev) => ({ ...prev, [numeroLinea]: productoId }));
+  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -84,6 +101,7 @@ export default function NuevaCompra() {
     setError("");
     setData(null);
     setGuardado(false);
+    setProductoMap({});
 
     const text = await f.text();
     fileRef.current = f;
@@ -106,6 +124,14 @@ export default function NuevaCompra() {
 
     const formData = new FormData();
     formData.append("archivo", fileRef.current);
+
+    const productosJson: Record<string, number> = {};
+    for (const [key, val] of Object.entries(productoMap)) {
+      if (val) productosJson[key] = parseInt(val, 10);
+    }
+    if (Object.keys(productosJson).length > 0) {
+      formData.append("productos", JSON.stringify(productosJson));
+    }
 
     try {
       await api.upload<{ success: boolean; factura_compra_id: number }>("/compras/upload", formData);
@@ -227,12 +253,13 @@ export default function NuevaCompra() {
               <thead>
                 <tr className="bg-gray-100 border-b">
                   <th className="text-left p-2">#</th>
-                  <th className="text-left p-2">Producto</th>
+                  <th className="text-left p-2">Código</th>
                   <th className="text-left p-2">Descripción</th>
                   <th className="text-center p-2">Und</th>
                   <th className="text-right p-2">Cantidad</th>
                   <th className="text-right p-2">Vr Unitario</th>
                   <th className="text-right p-2">Total</th>
+                  <th className="text-left p-2">Producto</th>
                 </tr>
               </thead>
               <tbody>
@@ -245,6 +272,18 @@ export default function NuevaCompra() {
                     <td className="text-right p-2">{item.cantidad}</td>
                     <td className="text-right p-2">{formatCurrency(item.valor_unitario)}</td>
                     <td className="text-right p-2 font-medium">{formatCurrency(item.valor_linea)}</td>
+                    <td className="p-2">
+                      <select
+                        value={productoMap[item.numero_linea] || ""}
+                        onChange={(e) => setProductoForLinea(item.numero_linea, e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+                      >
+                        <option value="">--</option>
+                        {productos.map((p) => (
+                          <option key={p.id} value={p.id}>{p.nombre}</option>
+                        ))}
+                      </select>
+                    </td>
                   </tr>
                 ))}
               </tbody>

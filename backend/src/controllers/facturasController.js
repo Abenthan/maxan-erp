@@ -63,7 +63,7 @@ async function getById(req, res) {
     }
 
     const itemsResult = await pool.query(
-      "SELECT * FROM facturacion.factura_items WHERE factura_id = $1 ORDER BY numero_linea",
+      "SELECT * FROM facturacion.ventas_items WHERE venta_id = $1 ORDER BY numero_linea",
       [id]
     );
     const impuestosResult = await pool.query(
@@ -100,7 +100,7 @@ async function parsearXml(req, res) {
 
     if (factura.numero_completo && factura.emisor?.numero_documento) {
       const dup = await pool.query(
-        `SELECT f.id FROM facturacion.facturas f
+        `SELECT f.id FROM facturacion.ventas f
          JOIN facturacion.terceros t ON t.id = f.emisor_id
          WHERE f.numero_completo = $1 AND t.numero_documento = $2
          LIMIT 1`,
@@ -141,7 +141,7 @@ async function create(req, res) {
 
     if (data.cufe) {
       const dup = await client.query(
-        "SELECT id FROM facturacion.facturas WHERE cufe = $1", [data.cufe]
+        "SELECT id FROM facturacion.ventas WHERE cufe = $1", [data.cufe]
       );
       if (dup.rows.length > 0) {
         await client.query("ROLLBACK");
@@ -153,7 +153,7 @@ async function create(req, res) {
     }
     if (data.numero_completo) {
       const dup = await client.query(
-        "SELECT id FROM facturacion.facturas WHERE numero_completo = $1 AND emisor_id = $2",
+        "SELECT id FROM facturacion.ventas WHERE numero_completo = $1 AND emisor_id = $2",
         [data.numero_completo, emisorId]
       );
       if (dup.rows.length > 0) {
@@ -166,7 +166,7 @@ async function create(req, res) {
     }
 
     const facturaQ = `
-      INSERT INTO facturacion.facturas
+      INSERT INTO facturacion.ventas
         (cufe, prefijo, numero, numero_completo, tipo_documento_code,
          customization_id, fecha_emision, hora_emision, fecha_vencimiento,
          moneda, valor_subtotal, valor_descuento, valor_recargo,
@@ -226,8 +226,8 @@ async function create(req, res) {
 
     if (data.items && data.items.length > 0) {
       const itemQ = `
-        INSERT INTO facturacion.factura_items
-          (factura_id, numero_linea, descripcion, codigo_producto,
+        INSERT INTO facturacion.ventas_items
+          (venta_id, numero_linea, descripcion, codigo_producto,
            cantidad, unidad_medida, valor_unitario,
            porcentaje_descuento, valor_descuento, valor_linea)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`;

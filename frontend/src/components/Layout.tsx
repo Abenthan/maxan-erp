@@ -7,7 +7,10 @@ const navItems = [
   { to: "/productos", label: "Productos", icon: "📦" },
   { to: "/compras", label: "Compras", icon: "📥" },
   { to: "/gastos", label: "Gastos", icon: "💰" },
-  { to: "/inventario", label: "Inventario", icon: "📊" },
+  { to: "/ventas-items", label: "Ventas Items", icon: "📋" },
+  { to: "/nueva-venta", label: "Nueva Venta", icon: "➕" },
+  { to: "/inventario", label: "Stock", icon: "📊" },
+  { to: "/inventario/movimientos", label: "Movimientos", icon: "🔄" },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {

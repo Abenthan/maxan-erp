@@ -9,7 +9,7 @@ async function utilidad(req, res) {
   try {
     const facturaResult = await pool.query(
       `SELECT id, numero_completo, valor_subtotal, valor_total_impuestos, valor_a_pagar
-       FROM facturacion.facturas WHERE id = $1`,
+       FROM facturacion.ventas WHERE id = $1`,
       [factura_id]
     );
     if (facturaResult.rows.length === 0) {
@@ -19,8 +19,8 @@ async function utilidad(req, res) {
     const utilidadResult = await pool.query(
       `SELECT v.*
        FROM facturacion.vw_utilidad_items v
-       JOIN facturacion.factura_items fi ON fi.id = v.factura_item_id
-       WHERE fi.factura_id = $1
+       JOIN facturacion.ventas_items fi ON fi.id = v.factura_item_id
+       WHERE fi.venta_id = $1
        ORDER BY fi.numero_linea`,
       [factura_id]
     );

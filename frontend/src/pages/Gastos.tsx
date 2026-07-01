@@ -1,5 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useApi } from "../context/ApiContext";
+
+interface Producto {
+  id: number;
+  nombre: string;
+}
 
 interface Gasto {
   id: number;
@@ -10,6 +15,7 @@ interface Gasto {
   valor_total: string;
   fecha: string;
   factura_compra_id: number | null;
+  producto_id: number | null;
 }
 
 function formatCurrency(n: number): string {
@@ -25,6 +31,7 @@ const clasifBadge: Record<string, string> = {
 export default function Gestos() {
   const api = useApi();
   const [gastos, setGastos] = useState<Gasto[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -38,7 +45,21 @@ export default function Gestos() {
   const [cant, setCant] = useState("1");
   const [vrUnit, setVrUnit] = useState("");
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [productoId, setProductoId] = useState("");
   const [guardando, setGuardando] = useState(false);
+
+  const cargar = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      api.get<Gasto[]>("/gastos"),
+      api.get<Producto[]>("/productos"),
+    ])
+      .then(([g, p]) => { setGastos(g); setProductos(p); })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [api]);
+
+  useEffect(() => { cargar(); }, [cargar]);
 
   function limpiarForm() {
     setEditId(null);
@@ -47,17 +68,8 @@ export default function Gestos() {
     setCant("1");
     setVrUnit("");
     setFecha(new Date().toISOString().slice(0, 10));
+    setProductoId("");
   }
-
-  function cargar() {
-    setLoading(true);
-    api.get<Gasto[]>("/gastos")
-      .then(setGastos)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(cargar, [api]);
 
   const filtrados = useMemo(() => {
     return gastos.filter((g) => {
@@ -82,6 +94,7 @@ export default function Gestos() {
     setCant(g.cantidad);
     setVrUnit(g.valor_unitario);
     setFecha(g.fecha.slice(0, 10));
+    setProductoId(g.producto_id ? String(g.producto_id) : "");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -91,7 +104,7 @@ export default function Gestos() {
     setGuardando(true);
     setError("");
     try {
-      const body = {
+      const body: Record<string, unknown> = {
         descripcion: desc.trim(),
         clasificacion: clasif,
         cantidad: parseFloat(cant),
@@ -99,6 +112,10 @@ export default function Gestos() {
         valor_total: totalCalculado,
         fecha,
       };
+      if (productoId) {
+        body.producto_id = parseInt(productoId, 10);
+        body.clasificacion = undefined;
+      }
       if (editId) {
         await api.put(`/gastos/${editId}`, body);
       } else {
@@ -171,6 +188,7 @@ export default function Gestos() {
               <tr className="bg-gray-50 border-b text-left">
                 <th className="p-3 font-semibold text-gray-600">Descripción</th>
                 <th className="p-3 font-semibold text-gray-600">Clasificación</th>
+                <th className="p-3 font-semibold text-gray-600">Producto</th>
                 <th className="p-3 font-semibold text-gray-600">Cantidad</th>
                 <th className="p-3 font-semibold text-gray-600 text-right">Vr Unitario</th>
                 <th className="p-3 font-semibold text-gray-600 text-right">Total</th>
@@ -180,29 +198,37 @@ export default function Gestos() {
             <tbody>
               {filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-400">
+                  <td colSpan={7} className="p-8 text-center text-gray-400">
                     {gastos.length === 0 ? "No hay gastos registrados" : "No se encontraron gastos con esos filtros"}
                   </td>
                 </tr>
               ) : (
-                filtrados.map((g) => (
-                  <tr
-                    key={g.id}
-                    onClick={() => seleccionar(g)}
-                    className={`border-b hover:bg-gray-50 cursor-pointer ${editId === g.id ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : ""}`}
-                  >
-                    <td className="p-3 font-medium">{g.descripcion}</td>
-                    <td className="p-3">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${clasifBadge[g.clasificacion] || "bg-gray-100 text-gray-800"}`}>
-                        {g.clasificacion}
-                      </span>
-                    </td>
-                    <td className="p-3 text-gray-600">{g.cantidad}</td>
-                    <td className="p-3 text-right">{formatCurrency(Number(g.valor_unitario))}</td>
-                    <td className="p-3 text-right font-medium">{formatCurrency(Number(g.valor_total))}</td>
-                    <td className="p-3 text-gray-600">{new Date(g.fecha).toLocaleDateString("es-CO")}</td>
-                  </tr>
-                ))
+                filtrados.map((g) => {
+                  const prod = productos.find((p) => p.id === g.producto_id);
+                  return (
+                    <tr
+                      key={g.id}
+                      onClick={() => seleccionar(g)}
+                      className={`border-b hover:bg-gray-50 cursor-pointer ${editId === g.id ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : ""}`}
+                    >
+                      <td className="p-3 font-medium">{g.descripcion}</td>
+                      <td className="p-3">
+                        {g.producto_id ? (
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${clasifBadge["Suministros"]}`}>Suministros</span>
+                        ) : (
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${clasifBadge[g.clasificacion] || "bg-gray-100 text-gray-800"}`}>
+                            {g.clasificacion}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-sm">{prod ? prod.nombre : "-"}</td>
+                      <td className="p-3 text-gray-600">{g.cantidad}</td>
+                      <td className="p-3 text-right">{formatCurrency(Number(g.valor_unitario))}</td>
+                      <td className="p-3 text-right font-medium">{formatCurrency(Number(g.valor_total))}</td>
+                      <td className="p-3 text-gray-600">{new Date(g.fecha).toLocaleDateString("es-CO")}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -226,11 +252,28 @@ export default function Gestos() {
             />
           </div>
           <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Producto (opcional)</label>
+            <select
+              value={productoId}
+              onChange={(e) => {
+                setProductoId(e.target.value);
+                if (e.target.value) setClasif("Operacional");
+              }}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- Ninguno --</option>
+              {productos.filter((p) => p.id).map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Clasificación</label>
             <select
               value={clasif}
               onChange={(e) => setClasif(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              disabled={!!productoId}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:text-gray-400"
             >
               <option value="Operacional">Operacional</option>
               <option value="Administrativo">Administrativo</option>

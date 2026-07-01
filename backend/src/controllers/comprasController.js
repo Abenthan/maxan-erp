@@ -8,6 +8,15 @@ async function upload(req, res) {
   const pool = getPool(req);
   const client = await pool.connect();
 
+  let productosMap = {};
+  if (req.body && req.body.productos) {
+    try {
+      productosMap = JSON.parse(req.body.productos);
+    } catch (_) {
+      return res.status(400).json({ error: "El campo 'productos' debe ser un JSON válido" });
+    }
+  }
+
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Debes enviar un archivo XML en el campo 'archivo'" });
@@ -108,20 +117,22 @@ async function upload(req, res) {
       const gastoQ = `
         INSERT INTO gastos.gastos
           (factura_compra_id, proveedor_id, descripcion,
-           clasificacion, cantidad, valor_unitario, valor_total, fecha)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           clasificacion, cantidad, valor_unitario, valor_total, fecha, producto_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
         RETURNING id`;
 
       for (const item of data.items) {
+        const prodId = (item.numero_linea && productosMap[String(item.numero_linea)]) || null;
         const gastoResult = await client.query(gastoQ, [
           facturaCompraId,
           proveedorId,
           item.descripcion || "Sin descripción",
-          "Operacional",
+          prodId ? "Suministros" : "Operacional",
           item.cantidad || 1,
           item.valor_unitario || 0,
           item.valor_linea || 0,
           data.fecha_emision || new Date(),
+          prodId,
         ]);
         totalGastos.push({
           gasto_id: gastoResult.rows[0].id,
@@ -149,6 +160,7 @@ async function upload(req, res) {
               cant > 0 ? +(itemImpValor / cant).toFixed(2) : 0,
               +itemImpValor.toFixed(2),
               data.fecha_emision || new Date(),
+              null,
             ]);
           }
         }

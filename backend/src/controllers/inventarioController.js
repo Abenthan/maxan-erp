@@ -35,7 +35,7 @@ async function movimientos(req, res) {
               s.created_at AS fecha, fi.descripcion, 'salida' AS tipo
        FROM inventario.salida_detalle sd
        JOIN inventario.salidas s ON s.id = sd.salida_id
-       LEFT JOIN facturacion.factura_items fi ON fi.id = s.factura_item_id
+       LEFT JOIN facturacion.ventas_items fi ON fi.id = s.factura_item_id
        WHERE s.producto_id = $1
        ORDER BY s.created_at ASC`,
       [producto_id]

@@ -159,6 +159,7 @@ async function update(req, res) {
     valor_unitario,
     valor_total,
     fecha,
+    producto_id,
   } = req.body;
 
   if (!descripcion || !descripcion.trim()) {
@@ -177,8 +178,8 @@ async function update(req, res) {
       `UPDATE gastos.gastos
        SET descripcion = $1, clasificacion = $2, cantidad = $3,
            valor_unitario = $4, valor_total = $5, fecha = $6,
-           updated_at = now()
-       WHERE id = $7
+           producto_id = $7, updated_at = now()
+       WHERE id = $8
        RETURNING *`,
       [
         descripcion.trim(),
@@ -187,6 +188,7 @@ async function update(req, res) {
         valor_unitario,
         computed_total,
         fecha || new Date(),
+        producto_id || null,
         id,
       ]
     );

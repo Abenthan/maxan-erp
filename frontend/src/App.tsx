@@ -8,7 +8,11 @@ import Productos from "./pages/Productos";
 import Gastos from "./pages/Gastos";
 import Compras from "./pages/Compras";
 import NuevaCompra from "./pages/NuevaCompra";
+import CompraDetalle from "./pages/CompraDetalle";
+import NuevaVenta from "./pages/NuevaVenta";
+import VentasItems from "./pages/VentasItems";
 import Inventario from "./pages/Inventario";
+import MovimientosInventario from "./pages/MovimientosInventario";
 import { ApiProvider } from "./context/ApiContext";
 import { DashboardProvider } from "./context/DashboardContext";
 
@@ -27,7 +31,11 @@ function App() {
               <Route path="/gastos" element={<Gastos />} />
               <Route path="/compras" element={<Compras />} />
               <Route path="/nueva-compra" element={<NuevaCompra />} />
+              <Route path="/compra/:id" element={<CompraDetalle />} />
+              <Route path="/nueva-venta" element={<NuevaVenta />} />
+              <Route path="/ventas-items" element={<VentasItems />} />
               <Route path="/inventario" element={<Inventario />} />
+              <Route path="/inventario/movimientos" element={<MovimientosInventario />} />
             </Routes>
           </Layout>
         </DashboardProvider>

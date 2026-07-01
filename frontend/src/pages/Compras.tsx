@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
 
 interface FacturaCompra {
@@ -27,6 +27,7 @@ const estadoBadge: Record<string, string> = {
 
 export default function Compras() {
   const api = useApi();
+  const navigate = useNavigate();
   const [compras, setCompras] = useState<FacturaCompra[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,7 +66,7 @@ export default function Compras() {
           </thead>
           <tbody>
             {compras.map((c) => (
-              <tr key={c.id} className="border-b hover:bg-gray-50">
+              <tr key={c.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/compra/${c.id}`)}>
                 <td className="p-3 font-medium">{c.numero_completo}</td>
                 <td className="p-3 text-gray-600">{new Date(c.fecha_emision).toLocaleDateString("es-CO")}</td>
                 <td className="p-3">
