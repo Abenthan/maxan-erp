@@ -14,6 +14,9 @@ import VentasItems from "./pages/VentasItems";
 import Inventario from "./pages/Inventario";
 import MovimientosInventario from "./pages/MovimientosInventario";
 import Utilidad from "./pages/Utilidad";
+import Cartera from "./pages/Cartera";
+import Pagos from "./pages/Pagos";
+import NuevoPago from "./pages/NuevoPago";
 import { ApiProvider } from "./context/ApiContext";
 import { DashboardProvider } from "./context/DashboardContext";
 
@@ -38,6 +41,9 @@ function App() {
               <Route path="/inventario" element={<Inventario />} />
               <Route path="/inventario/movimientos" element={<MovimientosInventario />} />
               <Route path="/utilidad" element={<Utilidad />} />
+              <Route path="/cartera" element={<Cartera />} />
+              <Route path="/cartera/pagos" element={<Pagos />} />
+              <Route path="/cartera/nuevo-pago" element={<NuevoPago />} />
             </Routes>
           </Layout>
         </DashboardProvider>

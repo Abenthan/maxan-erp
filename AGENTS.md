@@ -4,7 +4,7 @@
 - Sistema de facturación electrónica DIAN UBL 2.1 funcional
 - Backend: Node.js + Express 5 + PostgreSQL (pg, sin ORM) en puerto 3000
 - Frontend: React 19 + TypeScript 6 + Tailwind CSS 4 + Vite 8
-- UI: Sidebar lateral con grupos (VENTAS azul, COSTOS naranja, INVENTARIO verde) + header, Tailwind puro
+- UI: Sidebar lateral con grupos (VENTAS azul, COSTOS naranja, CARTERA púrpura, INVENTARIO verde) + header, Tailwind puro
 - BD vacía (todos los registros borrados)
 
 ## Sidebar (Layout.tsx)
@@ -17,6 +17,9 @@
 ── COSTOS ──        (bg-orange-50)
   📥 Compras
   💰 Gastos
+── CARTERA ──       (bg-purple-50)
+  📋 Cartera
+  💳 Pagos
 ── INVENTARIO ──    (bg-emerald-50)
   📦 Productos
   📊 Stock
@@ -40,6 +43,7 @@
 - **Categorías** — `routes/categorias.js` → `GET/POST/DELETE /api/productos/categorias` (maestro de categorías)
 - **Dashboard** — `routes/dashboard.js` → `GET /api/dashboard` con filtros `?mes=&cliente_id=&factura_id=`
   - Retorna: resumen, ventas_por_mes, gastos_por_mes, gastos_por_clasificacion, top_clientes, ultimas_facturas, clientes, productos_utilidad
+- **Cartera/Pagos** — `routes/cartera.js` → `GET /api/cartera/activa` (aging A/R), `POST/GET /api/cartera/pagos` (crear/listar), `GET /api/cartera/pagos/:id` (detalle), `POST /api/cartera/pagos/:id/anular`, `GET /api/cartera/clientes-deuda` (clientes con saldo), `GET /api/cartera/clientes-deuda/:id/facturas` (facturas pendientes), `GET/POST /api/cartera/medios-pago`
 
 ## Frontend módulos (implementados)
 - `pages/Dashboard.tsx` — Página principal `/` con cards de resumen, barras ventas/gastos/clasificación, top clientes, últimas facturas, utilidad por producto. Filtros: mes (select últimos 12 meses), cliente, factura ID.
@@ -50,12 +54,15 @@
 - `pages/Inventario.tsx` — Stock desde `vw_stock_disponible`
 - `pages/VentasItems.tsx` — Items de venta con filtros, dropdown de producto por fila + botón Consumir stock (PUT item + POST consumir), badge "Consumido"
 - `pages/Utilidad.tsx` — Dos tabs: Por Producto (tabla desde vw_utilidad_productos) y Por Factura (input ID + resumen + detalle líneas)
+- `pages/Cartera.tsx` — `/cartera` Tabla cartera activa con aging (días vencido coloreado, totales), filtros (cliente, estado), modal rápido para registrar pago con distribución por factura
+- `pages/Pagos.tsx` — `/cartera/pagos` Historial de pagos recibidos con detalle lateral y botón anular
+- `pages/NuevoPago.tsx` — `/cartera/nuevo-pago` Página dedicada paso a paso (cliente → facturas → confirmar)
 - `context/ApiContext.tsx` — Métodos: `get`, `post`, `put`, `del`, `postXml`, `upload`
 
 ## Schemas SQL
 - `db/01_schema.sql` — Schema `facturacion` (aplicado)
 - `db/02_compras_gastos_inventario.sql` — Schemas `compras`, `inventario`, `gastos` con tablas, triggers, vistas (`vw_stock_disponible`, `vw_utilidad_items`, `vw_utilidad_productos`) — **YA aplicado**
-- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`
+- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`
 
 ## Dependencias adicionales
 - `multer` (upload XML en compras)
@@ -83,6 +90,7 @@
 
 ## Lo que sigue (pendiente)
 1. Backend: probar todos los endpoints nuevos a fondo
+2. Módulo cartera/pagos: añadir dashboard de cartera al endpoint `/api/dashboard` (totales de cartera activa, vencidos)
 
 ## Comandos
 ```bash
@@ -107,4 +115,4 @@ docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp -c "TRUNCATE TABLE 
 - User: maxan_user
 - Pass: dev_password_segura
 - DB: maxan_erp
-- Schema: facturacion, compras, inventario, gastos, public
+- Schema: facturacion, compras, inventario, gastos, cartera, public

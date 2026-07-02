@@ -165,6 +165,7 @@ async function create(req, res) {
       }
     }
 
+    const valorAPagar = data.valor_a_pagar || 0;
     const facturaQ = `
       INSERT INTO facturacion.ventas
         (cufe, prefijo, numero, numero_completo, tipo_documento_code,
@@ -172,13 +173,13 @@ async function create(req, res) {
          moneda, valor_subtotal, valor_descuento, valor_recargo,
          valor_total_bruto, valor_total_impuestos, valor_iva, valor_inc, valor_ica,
          valor_total_neto, valor_retencion_fuente, valor_retencion_iva, valor_retencion_ica,
-         valor_anticipos, valor_a_pagar,
+         valor_anticipos, valor_a_pagar, saldo_pendiente,
          emisor_id, receptor_id,
          resolucion_numero, resolucion_fecha_desde, resolucion_fecha_hasta,
          resolucion_prefijo, resolucion_rango_desde, resolucion_rango_hasta,
          medio_pago_code, fecha_vencimiento_pago, periodo_facturacion,
          qr_code, estado)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38)
       RETURNING id`;
 
     const facturaVals = [
@@ -205,7 +206,8 @@ async function create(req, res) {
       data.valor_retencion_iva || 0,
       data.valor_retencion_ica || 0,
       data.valor_anticipos || 0,
-      data.valor_a_pagar || 0,
+      valorAPagar,
+      valorAPagar,
       emisorId,
       receptorId,
       data.resolucion_numero || null,
@@ -218,7 +220,7 @@ async function create(req, res) {
       data.fecha_vencimiento_pago || null,
       data.periodo_facturacion || null,
       data.qr_code || null,
-      "recibida",
+      "pendiente_pago",
     ];
 
     const facturaResult = await client.query(facturaQ, facturaVals);

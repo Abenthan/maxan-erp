@@ -33,6 +33,14 @@ const groups: NavGroup[] = [
     ],
   },
   {
+    label: "CARTERA",
+    bg: "bg-purple-50",
+    items: [
+      { to: "/cartera", label: "Cartera", icon: "📋" },
+      { to: "/cartera/pagos", label: "Pagos", icon: "💳" },
+    ],
+  },
+  {
     label: "INVENTARIO",
     bg: "bg-emerald-50",
     items: [

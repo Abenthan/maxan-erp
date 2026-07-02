@@ -124,22 +124,24 @@ async function create(req, res) {
     const subtotal = items.reduce((s, it) => s + (it.valor_linea || 0), 0);
     const total = items.reduce((s, it) => s + (it.valor_total || it.valor_linea || 0), 0);
 
+    const valorFinal = total || subtotal;
     const ventaResult = await client.query(
       `INSERT INTO facturacion.ventas
          (numero_completo, fecha_emision, moneda,
-          valor_subtotal, valor_a_pagar,
+          valor_subtotal, valor_a_pagar, saldo_pendiente,
           emisor_id, receptor_id, estado)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING id`,
       [
         `VENTA-${Date.now()}`,
         fecha_emision,
         moneda || "COP",
         subtotal,
-        total || subtotal,
+        valorFinal,
+        valorFinal,
         1,
         receptorId,
-        "recibida",
+        "pendiente_pago",
       ]
     );
     const ventaId = ventaResult.rows[0].id;
