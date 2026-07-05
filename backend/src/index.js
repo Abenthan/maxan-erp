@@ -11,6 +11,7 @@ const ventasRouter = require("./routes/ventas");
 const categoriasRouter = require("./routes/categorias");
 const dashboardRouter = require("./routes/dashboard");
 const carteraRouter = require("./routes/cartera");
+const clasificacionesGastoRouter = require("./routes/clasificacionesGasto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,6 +32,7 @@ app.use(express.json({ type: "application/json" }));
 app.use("/api/facturas", facturasRouter);
 app.use("/api/productos/categorias", categoriasRouter);
 app.use("/api/productos", productosRouter);
+app.use("/api/gastos/clasificaciones", clasificacionesGastoRouter);
 app.use("/api/gastos", gastosRouter);
 app.use("/api/compras", comprasRouter);
 app.use("/api/inventario", inventarioRouter);

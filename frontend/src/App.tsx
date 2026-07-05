@@ -11,6 +11,7 @@ import NuevaCompra from "./pages/NuevaCompra";
 import CompraDetalle from "./pages/CompraDetalle";
 import NuevaVenta from "./pages/NuevaVenta";
 import VentasItems from "./pages/VentasItems";
+import GastosPorVentaItem from "./pages/GastosPorVentaItem";
 import Inventario from "./pages/Inventario";
 import MovimientosInventario from "./pages/MovimientosInventario";
 import Utilidad from "./pages/Utilidad";
@@ -38,6 +39,7 @@ function App() {
               <Route path="/compra/:id" element={<CompraDetalle />} />
               <Route path="/nueva-venta" element={<NuevaVenta />} />
               <Route path="/ventas-items" element={<VentasItems />} />
+              <Route path="/ventas-items/:id/gastos" element={<GastosPorVentaItem />} />
               <Route path="/inventario" element={<Inventario />} />
               <Route path="/inventario/movimientos" element={<MovimientosInventario />} />
               <Route path="/utilidad" element={<Utilidad />} />

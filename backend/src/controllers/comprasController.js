@@ -156,6 +156,7 @@ async function upload(req, res) {
               facturaCompraId,
               proveedorId,
               `${nombre.toLowerCase()} ${item.numero_linea} compra ${data.numero_completo} (${imp.porcentaje || 0}%)`,
+              null,
               "Operacional",
               cant,
               cant > 0 ? +(itemImpValor / cant).toFixed(2) : 0,

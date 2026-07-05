@@ -34,7 +34,8 @@
 
 ## Nuevos módulos backend
 - **Productos** — `routes/productos.js` → `POST/GET/PUT /api/productos`, `GET/POST/DELETE /api/productos/categorias`
-- **Gastos** — `routes/gastos.js` → `POST/GET /api/gastos`, `PUT /api/gastos/:id` (crear y editar gasto manual), filtro `?producto_id=`
+- **Gastos** — `routes/gastos.js` → `POST/GET /api/gastos`, `PUT /api/gastos/:id`, `PUT /api/gastos/:id/vincular` (vincular/desvincular a venta_item_id), filtros `?producto_id=`, `?venta_item_id=`, `?sin_vinculo=true`
+- **Clasificaciones de Gasto** — `routes/clasificacionesGasto.js` → `GET/POST/DELETE /api/gastos/clasificaciones` (maestro como categorías de producto, con FK en `gastos.gastos.clasificacion`)
 - **Compras** — `routes/compras.js` → `POST /api/compras/upload` (multer + reuso de `parseInvoiceXML`), `POST /api/compras/parsear-xml` (solo parseo, sin guardar), `GET /api/compras`
   - Al guardar una compra, por cada línea crea un gasto en `gastos.gastos` y por cada impuesto (>0) crea un gasto adicional distribuido proporcionalmente según `item.valor_linea / subtotal_total`
 - **Inventario** — `routes/inventario.js` → `GET /api/inventario/stock`, `GET /api/inventario/movimientos/:producto_id`, `POST /api/inventario/consumir` (FIFO transaccional)
@@ -62,7 +63,7 @@
 ## Schemas SQL
 - `db/01_schema.sql` — Schema `facturacion` (aplicado)
 - `db/02_compras_gastos_inventario.sql` — Schemas `compras`, `inventario`, `gastos` con tablas, triggers, vistas (`vw_stock_disponible`, `vw_utilidad_items`, `vw_utilidad_productos`) — **YA aplicado**
-- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`
+- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`
 
 ## Dependencias adicionales
 - `multer` (upload XML en compras)
@@ -91,6 +92,68 @@
 ## Lo que sigue (pendiente)
 1. Backend: probar todos los endpoints nuevos a fondo
 2. Módulo cartera/pagos: añadir dashboard de cartera al endpoint `/api/dashboard` (totales de cartera activa, vencidos)
+
+## Vinculación gastos operativos a items de venta
+
+Un gasto operativo (ej: "Transporte para mantenimiento") se puede vincular a un `venta_item_id` específico para que su costo se refleje SOLO contra esa línea de factura, no contra todas las ventas de ese producto.
+
+### Cómo funciona
+- `gastos.gastos.venta_item_id` → FK a `facturacion.ventas_items(id)`
+- Excluyente: no puede tener `producto_id` Y `venta_item_id` al mismo tiempo (CHECK constraint)
+- `vw_utilidad_items` suma `SUM(gastos.valor_total) WHERE venta_item_id IS NOT NULL` como `costo_directo` por línea
+
+### Frontend: Gastos.tsx
+- Formulario incluye select anidado: "Factura de Venta" → "Item de Venta"
+- Si se selecciona item de venta, se limpia producto_id (y viceversa)
+- Guarda `venta_item_id` en POST y PUT
+
+### Frontend: VentasItems.tsx (página `/ventas-items`)
+- Columnas: Fecha, Venta, #, Descripción, Cliente, Cant, Vr Unit, Total, **Acción**
+- Botones en Acción:
+  - **Producto**: modal para seleccionar producto → hace `PUT /api/ventas/items/:id` (producto_id) + `POST /api/inventario/consumir` (FIFO)
+  - **Ver**: navega a `/factura/:id`
+  - **Gastos**: navega a `/ventas-items/:id/gastos`
+- Ya NO tiene columna Producto dropdown ni botón Consumir en la tabla
+
+### Nueva página: `/ventas-items/:id/gastos`
+- Componente: `pages/GastosPorVentaItem.tsx`
+- Muestra info del item de venta (factura, cliente, descripción, valor)
+- **Tabla 1**: Gastos vinculados (`GET /api/gastos?venta_item_id=X`), cada fila con botón "Desvincular"
+- **Tabla 2**: Gastos sin vínculo (`GET /api/gastos?sin_vinculo=true`), cada fila con botón "Vincular"
+- Entre ambas tablas: filtros de búsqueda por descripción + rango de fechas para gastos sin vincular
+- Filas clickeables: abren modal para editar el gasto (fecha, clasificación, descripción, valor unitario, cantidad)
+- Vincular/Desvincular usa `PUT /api/gastos/:id/vincular` con body `{ venta_item_id: X|null }`
+
+### Backend: gastosController.js
+- `GET /api/gastos` — nuevos filtros: `?venta_item_id=X`, `?sin_vinculo=true`
+- `PUT /api/gastos/:id` — ahora actualiza `venta_item_id` también (con validación mutex producto_id)
+- `PUT /api/gastos/:id/vincular` — endpoint dedicado para vincular/desvincular (solo actualiza venta_item_id, sin validaciones de otros campos)
+
+## Migración CSV a Gastos
+
+Script en `backend/scripts/importar-gastos-csv.js` para importar gastos desde archivos CSV bancarios.
+
+### Formato esperado del CSV
+- Delimitador: `;` (punto y coma)
+- Columnas: `Fecha;Descripcion;Valor`
+- Fecha: formato `DD-mmm` (ej. `6-may`, `21-jun`) — mes en español abreviado (ene, feb, mar, abr, may, jun, jul, ago, sep, oct, nov, dic)
+- Valor: formato `$ X.XXX` (pesos colombianos con . como separador de miles)
+- Primera línea = encabezado (se salta)
+- Año = año actual del sistema
+- Clasificación asignada: `Administrativo`
+
+### Cómo usar
+```bash
+cd backend
+node scripts/importar-gastos-csv.js
+```
+
+### Para importar otro archivo CSV
+1. Colocar el archivo en `Archivos/`
+2. Editar `backend/scripts/importar-gastos-csv.js`:
+   - Cambiar `csvName` con el nombre del archivo
+   - Si el formato cambia (clasificación diferente, columnas distintas), ajustar el parseo
+3. Ejecutar: `node scripts/importar-gastos-csv.js`
 
 ## Comandos
 ```bash

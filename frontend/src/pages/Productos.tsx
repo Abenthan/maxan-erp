@@ -30,6 +30,7 @@ export default function Productos() {
   const [categoria, setCategoria] = useState("");
   const [unidad, setUnidad] = useState("UND");
   const [inventariable, setInventariable] = useState(true);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [creando, setCreando] = useState(false);
 
   const [busqueda, setBusqueda] = useState("");
@@ -65,6 +66,7 @@ export default function Productos() {
 
   function limpiarForm() {
     setEditId(null);
+    setEditModalOpen(false);
     setCodigo("");
     setNombre("");
     setCategoria("");
@@ -74,6 +76,7 @@ export default function Productos() {
 
   function seleccionar(p: Producto) {
     setEditId(p.id);
+    setEditModalOpen(true);
     setCodigo(p.codigo);
     setNombre(p.nombre);
     setCategoria(p.categoria);
@@ -240,104 +243,194 @@ export default function Productos() {
         </table>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
-          {editId ? "Editar Producto" : "Nuevo Producto"}
-        </h2>
-        <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[150px]">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Código *</label>
-            <input
-              type="text"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              required
-              placeholder="Ej: PROD-001"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Nombre *</label>
-            <input
-              type="text"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              required
-              placeholder="Nombre del producto"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
-            <div className="flex gap-1">
+      {!editId && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Nuevo Producto</h2>
+          <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Código *</label>
+              <input
+                type="text"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value)}
+                required
+                placeholder="Ej: PROD-001"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Nombre *</label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                required
+                placeholder="Nombre del producto"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
+              <div className="flex gap-1">
+                <select
+                  value={categoria}
+                  onChange={(e) => setCategoria(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
+                >
+                  <option value="">-- Sin categoría --</option>
+                  {categorias.map((c) => (
+                    <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => { setNuevaCat(""); setCatError(""); setShowCatModal(true); }}
+                  title="Administrar categorías"
+                  className="px-2.5 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600"
+                >
+                  ⚙
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Unidad</label>
               <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
+                value={unidad}
+                onChange={(e) => setUnidad(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">-- Sin categoría --</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.nombre}>{c.nombre}</option>
-                ))}
+                <option value="UND">Unidad (UND)</option>
+                <option value="NIU">Pieza (NIU)</option>
+                <option value="KGM">Kilogramo (KGM)</option>
+                <option value="LTR">Litro (LTR)</option>
+                <option value="MTR">Metro (MTR)</option>
+                <option value="MTK">Metro cuadrado (MTK)</option>
+                <option value="HUR">Hora (HUR)</option>
+                <option value="DAY">Día (DAY)</option>
+                <option value="MON">Mes (MON)</option>
               </select>
+            </div>
+            <div className="flex items-center gap-2 pb-2">
+              <input
+                type="checkbox"
+                id="inventariable"
+                checked={inventariable}
+                onChange={(e) => setInventariable(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="inventariable" className="text-sm text-gray-700">Inventariable</label>
+            </div>
+            <div className="flex gap-2">
               <button
-                type="button"
-                onClick={() => { setNuevaCat(""); setCatError(""); setShowCatModal(true); }}
-                title="Administrar categorías"
-                className="px-2.5 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600"
+                type="submit"
+                disabled={creando || !codigo.trim() || !nombre.trim()}
+                className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
               >
-                ⚙
+                {creando ? "Guardando..." : "Crear Producto"}
               </button>
             </div>
+          </form>
+        </div>
+      )}
+
+      {editId && editModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => limpiarForm()}>
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Editar Producto</h2>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Código *</label>
+                <input
+                  type="text"
+                  value={codigo}
+                  onChange={(e) => setCodigo(e.target.value)}
+                  required
+                  placeholder="Ej: PROD-001"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Nombre *</label>
+                <input
+                  type="text"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  required
+                  placeholder="Nombre del producto"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
+                <div className="flex gap-1">
+                  <select
+                    value={categoria}
+                    onChange={(e) => setCategoria(e.target.value)}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Sin categoría --</option>
+                    {categorias.map((c) => (
+                      <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => { setNuevaCat(""); setCatError(""); setShowCatModal(true); }}
+                    title="Administrar categorías"
+                    className="px-2.5 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600"
+                  >
+                    ⚙
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Unidad</label>
+                <select
+                  value={unidad}
+                  onChange={(e) => setUnidad(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="UND">Unidad (UND)</option>
+                  <option value="NIU">Pieza (NIU)</option>
+                  <option value="KGM">Kilogramo (KGM)</option>
+                  <option value="LTR">Litro (LTR)</option>
+                  <option value="MTR">Metro (MTR)</option>
+                  <option value="MTK">Metro cuadrado (MTK)</option>
+                  <option value="HUR">Hora (HUR)</option>
+                  <option value="DAY">Día (DAY)</option>
+                  <option value="MON">Mes (MON)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="inventariable-modal"
+                  checked={inventariable}
+                  onChange={(e) => setInventariable(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="inventariable-modal" className="text-sm text-gray-700">Inventariable</label>
+              </div>
+              <div className="sm:col-span-2 flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={limpiarForm}
+                  className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creando || !codigo.trim() || !nombre.trim()}
+                  className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {creando ? "Guardando..." : "Actualizar Producto"}
+                </button>
+              </div>
+            </form>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Unidad</label>
-            <select
-              value={unidad}
-              onChange={(e) => setUnidad(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="UND">Unidad (UND)</option>
-              <option value="NIU">Pieza (NIU)</option>
-              <option value="KGM">Kilogramo (KGM)</option>
-              <option value="LTR">Litro (LTR)</option>
-              <option value="MTR">Metro (MTR)</option>
-              <option value="MTK">Metro cuadrado (MTK)</option>
-              <option value="HUR">Hora (HUR)</option>
-              <option value="DAY">Día (DAY)</option>
-              <option value="MON">Mes (MON)</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2 pb-2">
-            <input
-              type="checkbox"
-              id="inventariable"
-              checked={inventariable}
-              onChange={(e) => setInventariable(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <label htmlFor="inventariable" className="text-sm text-gray-700">Inventariable</label>
-          </div>
-          <div className="flex gap-2">
-            {editId && (
-              <button
-                type="button"
-                onClick={limpiarForm}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-            )}
-            <button
-              type="submit"
-              disabled={creando || !codigo.trim() || !nombre.trim()}
-              className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
-            >
-              {creando ? "Guardando..." : editId ? "Actualizar Producto" : "Crear Producto"}
-            </button>
-          </div>
-        </form>
-      </div>
+        </div>
+      )}
 
       {showCatModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCatModal(false)}>
