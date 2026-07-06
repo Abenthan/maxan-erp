@@ -231,8 +231,9 @@ async function create(req, res) {
         INSERT INTO facturacion.ventas_items
           (venta_id, numero_linea, descripcion, codigo_producto,
            cantidad, unidad_medida, valor_unitario,
-           porcentaje_descuento, valor_descuento, valor_linea)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`;
+           porcentaje_descuento, valor_descuento, valor_linea,
+           valor_retencion_fuente)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`;
       for (const item of data.items) {
         await client.query(itemQ, [
           facturaId,
@@ -245,6 +246,7 @@ async function create(req, res) {
           item.porcentaje_descuento || 0,
           item.valor_descuento || 0,
           item.valor_linea || 0,
+          item.valor_retencion_fuente || 0,
         ]);
       }
     }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
 
@@ -8,6 +8,15 @@ interface ItemLinea {
   valor_unitario: string;
 }
 
+interface ClienteResult {
+  id: number;
+  tipo_documento: string;
+  numero_documento: string;
+  razon_social: string;
+  direccion: string;
+  ciudad: string;
+}
+
 function formatCurrency(n: number): string {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 2 }).format(n);
 }
@@ -15,12 +24,16 @@ function formatCurrency(n: number): string {
 export default function NuevaVenta() {
   const navigate = useNavigate();
   const api = useApi();
+  const clienteRef = useRef<HTMLDivElement>(null);
 
   const [cliente, setCliente] = useState("");
   const [nit, setNit] = useState("");
   const [tipoDoc, setTipoDoc] = useState("13");
   const [dir, setDir] = useState("");
   const [ciudad, setCiudad] = useState("");
+  const [sugerencias, setSugerencias] = useState<ClienteResult[]>([]);
+  const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
+  const [buscando, setBuscando] = useState(false);
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [lineas, setLineas] = useState<ItemLinea[]>([
     { descripcion: "", cantidad: "1", valor_unitario: "" },
@@ -28,6 +41,37 @@ export default function NuevaVenta() {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
+
+  useEffect(() => {
+    if (cliente.length < 2) { setSugerencias([]); setMostrarSugerencias(false); return; }
+    setBuscando(true);
+    const timer = setTimeout(() => {
+      api.get<ClienteResult[]>(`/terceros?q=${encodeURIComponent(cliente)}`)
+        .then((res) => { setSugerencias(res); setMostrarSugerencias(res.length > 0); })
+        .catch(() => {})
+        .finally(() => setBuscando(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [api, cliente]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (clienteRef.current && !clienteRef.current.contains(e.target as Node)) {
+        setMostrarSugerencias(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function seleccionarCliente(c: ClienteResult) {
+    setCliente(c.razon_social);
+    setNit(c.numero_documento);
+    setTipoDoc(c.tipo_documento);
+    setDir(c.direccion || "");
+    setCiudad(c.ciudad || "");
+    setMostrarSugerencias(false);
+  }
 
   function actualizarLinea(idx: number, campo: keyof ItemLinea, valor: string) {
     setLineas((prev) => {
@@ -136,16 +180,36 @@ export default function NuevaVenta() {
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2 relative" ref={clienteRef}>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Cliente *</label>
                 <input
                   type="text"
                   value={cliente}
-                  onChange={(e) => setCliente(e.target.value)}
+                  onChange={(e) => { setCliente(e.target.value); setNit(""); setDir(""); setCiudad(""); }}
                   required
                   placeholder="Nombre o razón social"
+                  autoComplete="off"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {mostrarSugerencias && (
+                  <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {buscando && <p className="p-2 text-xs text-gray-400">Buscando...</p>}
+                    {sugerencias.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => seleccionarCliente(c)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-0"
+                      >
+                        <span className="font-medium">{c.razon_social}</span>
+                        <span className="text-gray-500 ml-2 text-xs">{c.numero_documento}</span>
+                        {(c.direccion || c.ciudad) && (
+                          <span className="text-gray-400 ml-2 text-xs">· {c.direccion}{c.direccion && c.ciudad ? ", " : ""}{c.ciudad}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Dirección</label>

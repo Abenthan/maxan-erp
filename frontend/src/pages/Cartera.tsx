@@ -2,14 +2,6 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useApi } from "../context/ApiContext";
 import { useNavigate } from "react-router-dom";
 
-interface ClienteDeuda {
-  id: number;
-  razon_social: string;
-  numero_documento: string;
-  total_deuda: string;
-  facturas_pendientes: number;
-}
-
 interface CarteraItem {
   venta_id: number;
   numero_completo: string;
@@ -61,34 +53,37 @@ export default function Cartera() {
   const navigate = useNavigate();
 
   const [items, setItems] = useState<CarteraItem[]>([]);
-  const [clientes, setClientes] = useState<ClienteDeuda[]>([]);
   const [mediosPago, setMediosPago] = useState<MedioPago[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [filtroCliente, setFiltroCliente] = useState("");
+  const [filtroClienteTexto, setFiltroClienteTexto] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
 
   const cargar = useCallback(() => {
     setLoading(true);
     setError("");
     const params = new URLSearchParams();
-    if (filtroCliente) params.set("cliente_id", filtroCliente);
     if (filtroEstado) params.set("estado_cartera", filtroEstado);
     Promise.all([
       api.get<CarteraItem[]>(`/cartera/activa?${params.toString()}`),
-      api.get<ClienteDeuda[]>("/cartera/clientes-deuda"),
       api.get<MedioPago[]>("/cartera/medios-pago"),
     ])
-      .then(([cartera, cl, mp]) => { setItems(cartera); setClientes(cl); setMediosPago(mp); })
+      .then(([cartera, mp]) => { setItems(cartera); setMediosPago(mp); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [api, filtroCliente, filtroEstado]);
+  }, [api, filtroEstado]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
+  const itemsFiltrados = useMemo(() => {
+    if (!filtroClienteTexto) return items;
+    const t = filtroClienteTexto.toLowerCase();
+    return items.filter((i) => i.cliente.toLowerCase().includes(t) || i.nit_cliente.includes(t));
+  }, [items, filtroClienteTexto]);
+
   const totales = useMemo(() => {
-    return items.reduce(
+    return itemsFiltrados.reduce(
       (acc, i) => ({
         valor: acc.valor + Number(i.valor_a_pagar),
         pagado: acc.pagado + Number(i.total_pagado),
@@ -105,29 +100,39 @@ export default function Cartera() {
   const [cargandoFacturas, setCargandoFacturas] = useState(false);
   const [pagoFecha, setPagoFecha] = useState(new Date().toISOString().slice(0, 10));
   const [pagoMedio, setPagoMedio] = useState("");
+  const mediosPermitidos = useMemo(() => ["Efectivo", "Transferencia Bancaria"], []);
   const [pagoReferencia, setPagoReferencia] = useState("");
   const [pagoObservaciones, setPagoObservaciones] = useState("");
   const [pagoValor, setPagoValor] = useState("");
   const [pagoAplicaciones, setPagoAplicaciones] = useState<Record<number, string>>({});
+  const [retenciones, setRetenciones] = useState<Record<number, string>>({});
   const [guardando, setGuardando] = useState(false);
+
+  function saldoNeto(f: any, retencionManual = 0): number {
+    const base = Number(f.saldo_pendiente);
+    const ret = retencionManual || Number(f.valor_retencion_fuente || 0);
+    return Math.max(base - ret, 0);
+  }
 
   function abrirModal(clienteId: number, clienteNombre: string) {
     setModalClienteId(clienteId);
     setModalClienteNombre(clienteNombre);
     setPagoFecha(new Date().toISOString().slice(0, 10));
-    setPagoMedio("");
+    const defaultMedio = mediosPago.find((m) => m.nombre === "Transferencia Bancaria");
+    setPagoMedio(defaultMedio ? String(defaultMedio.id) : "");
     setPagoReferencia("");
     setPagoObservaciones("");
     setPagoValor("");
     setPagoAplicaciones({});
+    setRetenciones({});
     setCargandoFacturas(true);
     api.get<any[]>(`/cartera/clientes-deuda/${clienteId}/facturas`)
       .then((facturas) => {
         setFacturasCliente(facturas);
-        const totalDeuda = facturas.reduce((s: number, f: any) => s + Number(f.saldo_pendiente), 0);
+        const totalDeuda = facturas.reduce((s: number, f: any) => s + saldoNeto(f), 0);
         setPagoValor(totalDeuda.toString());
         const apps: Record<number, string> = {};
-        facturas.forEach((f: any) => { apps[f.venta_id] = f.saldo_pendiente; });
+        facturas.forEach((f: any) => { apps[f.venta_id] = String(saldoNeto(f)); });
         setPagoAplicaciones(apps);
       })
       .catch((e) => setError(e.message))
@@ -135,8 +140,26 @@ export default function Cartera() {
     setShowModal(true);
   }
 
+  function handleRetencionChange(ventaId: number, valor: string) {
+    const f = facturasCliente.find((ff) => ff.venta_id === ventaId);
+    if (!f) return;
+    const ret = Math.min(Math.max(parseFloat(valor) || 0, 0), Number(f.saldo_pendiente));
+    const nuevasRet = { ...retenciones, [ventaId]: String(ret) };
+    setRetenciones(nuevasRet);
+    const neto = saldoNeto(f, ret);
+    const nuevasApps = { ...pagoAplicaciones, [ventaId]: String(Math.min(parseFloat(pagoAplicaciones[ventaId] || "0"), neto)) };
+    setPagoAplicaciones(nuevasApps);
+    const total = Object.values(nuevasApps).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+    setPagoValor(total.toString());
+  }
+
   function handleAplicacionChange(ventaId: number, valor: string) {
-    const nuevas = { ...pagoAplicaciones, [ventaId]: valor };
+    const f = facturasCliente.find((ff) => ff.venta_id === ventaId);
+    if (!f) return;
+    const ret = parseFloat(retenciones[ventaId] || "0");
+    const maxNeto = Math.max(Number(f.saldo_pendiente) - ret, 0);
+    const v = Math.min(Math.max(parseFloat(valor) || 0, 0), maxNeto);
+    const nuevas = { ...pagoAplicaciones, [ventaId]: String(v || "0") };
     setPagoAplicaciones(nuevas);
     const total = Object.values(nuevas).reduce((s, v) => s + (parseFloat(v) || 0), 0);
     setPagoValor(total.toString());
@@ -145,7 +168,8 @@ export default function Cartera() {
   function distribuirPorcentaje(pct: number) {
     const nuevas: Record<number, string> = {};
     facturasCliente.forEach((f) => {
-      nuevas[f.venta_id] = ((Number(f.saldo_pendiente) * pct) / 100).toFixed(2);
+      const ret = parseFloat(retenciones[f.venta_id] || "0");
+      nuevas[f.venta_id] = ((saldoNeto(f, ret) * pct) / 100).toFixed(2);
     });
     setPagoAplicaciones(nuevas);
     const total = Object.values(nuevas).reduce((s, v) => s + (parseFloat(v) || 0), 0);
@@ -160,7 +184,11 @@ export default function Cartera() {
     try {
       const aplicaciones = Object.entries(pagoAplicaciones)
         .filter(([, v]) => parseFloat(v) > 0)
-        .map(([ventaId, valor]) => ({ venta_id: parseInt(ventaId, 10), valor_aplicado: parseFloat(valor) }));
+        .map(([ventaId, valor]) => ({
+          venta_id: parseInt(ventaId, 10),
+          valor_aplicado: parseFloat(valor),
+          retencion: parseFloat(retenciones[ventaId] || "0") || undefined,
+        }));
 
       await api.post("/cartera/pagos", {
         cliente_id: modalClienteId,
@@ -202,16 +230,13 @@ export default function Cartera() {
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Cliente</label>
-            <select
-              value={filtroCliente}
-              onChange={(e) => setFiltroCliente(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            >
-              <option value="">Todos los clientes</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>{c.razon_social} - ${formatCurrency(Number(c.total_deuda))}</option>
-              ))}
-            </select>
+            <input
+              type="text"
+              value={filtroClienteTexto}
+              onChange={(e) => setFiltroClienteTexto(e.target.value)}
+              placeholder="Buscar por nombre o NIT..."
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 w-64"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Estado</label>
@@ -227,7 +252,7 @@ export default function Cartera() {
             </select>
           </div>
           <button
-            onClick={() => { setFiltroCliente(""); setFiltroEstado(""); }}
+            onClick={() => { setFiltroClienteTexto(""); setFiltroEstado(""); }}
             className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
           >
             Limpiar
@@ -253,12 +278,12 @@ export default function Cartera() {
               </tr>
             </thead>
             <tbody>
-              {items.length === 0 ? (
+              {itemsFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-8 text-center text-gray-400">No hay facturas pendientes</td>
+                  <td colSpan={10} className="p-8 text-center text-gray-400">{items.length === 0 ? "No hay facturas pendientes" : "Ninguna factura coincide con el filtro"}</td>
                 </tr>
               ) : (
-                items.map((it) => (
+                itemsFiltrados.map((it) => (
                   <tr key={it.venta_id} className={`border-b hover:bg-gray-50 ${it.dias_vencida > 0 ? "bg-red-50/30" : ""}`}>
                     <td className="p-3 font-medium">{it.numero_completo}</td>
                     <td className="p-3">
@@ -292,7 +317,7 @@ export default function Cartera() {
                 ))
               )}
             </tbody>
-            {items.length > 0 && (
+            {itemsFiltrados.length > 0 && (
               <tfoot className="bg-gray-50 border-t-2 border-gray-200">
                 <tr>
                   <td colSpan={4} className="p-3 font-semibold text-gray-700">Totales</td>
@@ -333,8 +358,7 @@ export default function Cartera() {
                       onChange={(e) => setPagoMedio(e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     >
-                      <option value="">Seleccionar...</option>
-                      {mediosPago.map((mp) => (
+                      {mediosPago.filter((mp) => mediosPermitidos.includes(mp.nombre)).map((mp) => (
                         <option key={mp.id} value={mp.id}>{mp.nombre}</option>
                       ))}
                     </select>
@@ -391,29 +415,44 @@ export default function Cartera() {
                           <th className="pb-2 font-medium">Fecha</th>
                           <th className="pb-2 font-medium text-right">Vcto</th>
                           <th className="pb-2 font-medium text-right">Saldo</th>
+                          <th className="pb-2 font-medium text-right">Retención</th>
                           <th className="pb-2 font-medium text-right">A pagar</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {facturasCliente.map((f: any) => (
-                          <tr key={f.venta_id} className="border-b last:border-0">
-                            <td className="py-2 text-gray-800">{f.numero_completo}</td>
-                            <td className="py-2 text-gray-600">{formatDate(f.fecha_emision)}</td>
-                            <td className="py-2 text-gray-600 text-right">{f.fecha_vencimiento_pago ? formatDate(f.fecha_vencimiento_pago) : "-"}</td>
-                            <td className="py-2 text-right font-medium">{formatCurrency(Number(f.saldo_pendiente))}</td>
-                            <td className="py-2 text-right">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                max={f.saldo_pendiente}
-                                value={pagoAplicaciones[f.venta_id] || ""}
-                                onChange={(e) => handleAplicacionChange(f.venta_id, e.target.value)}
-                                className="w-28 px-2 py-1 text-xs border border-gray-300 rounded text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
-                              />
-                            </td>
-                          </tr>
-                        ))}
+                        {facturasCliente.map((f: any) => {
+                          const ret = parseFloat(retenciones[f.venta_id] || "0") || Number(f.valor_retencion_fuente || 0);
+                          return (
+                            <tr key={f.venta_id} className="border-b last:border-0">
+                              <td className="py-2 text-gray-800">{f.numero_completo}</td>
+                              <td className="py-2 text-gray-600">{formatDate(f.fecha_emision)}</td>
+                              <td className="py-2 text-gray-600 text-right">{f.fecha_vencimiento_pago ? formatDate(f.fecha_vencimiento_pago) : "-"}</td>
+                              <td className="py-2 text-right font-medium">{formatCurrency(Number(f.saldo_pendiente))}</td>
+                              <td className="py-2 text-right">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0"
+                                  value={retenciones[f.venta_id] || ""}
+                                  onChange={(e) => handleRetencionChange(f.venta_id, e.target.value)}
+                                  className="w-20 px-2 py-1 text-xs border border-gray-300 rounded text-right focus:outline-none focus:ring-2 focus:ring-orange-500 text-orange-600"
+                                />
+                              </td>
+                              <td className="py-2 text-right">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max={saldoNeto(f, ret)}
+                                  value={pagoAplicaciones[f.venta_id] || ""}
+                                  onChange={(e) => handleAplicacionChange(f.venta_id, e.target.value)}
+                                  className="w-28 px-2 py-1 text-xs border border-gray-300 rounded text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   )}

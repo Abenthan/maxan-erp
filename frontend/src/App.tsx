@@ -18,6 +18,9 @@ import Utilidad from "./pages/Utilidad";
 import Cartera from "./pages/Cartera";
 import Pagos from "./pages/Pagos";
 import NuevoPago from "./pages/NuevoPago";
+import Retenciones from "./pages/Retenciones";
+import Terceros from "./pages/Terceros";
+import NuevoTercero from "./pages/NuevoTercero";
 import { ApiProvider } from "./context/ApiContext";
 import { DashboardProvider } from "./context/DashboardContext";
 
@@ -46,6 +49,9 @@ function App() {
               <Route path="/cartera" element={<Cartera />} />
               <Route path="/cartera/pagos" element={<Pagos />} />
               <Route path="/cartera/nuevo-pago" element={<NuevoPago />} />
+              <Route path="/cartera/retenciones" element={<Retenciones />} />
+              <Route path="/terceros" element={<Terceros />} />
+              <Route path="/nuevo-tercero" element={<NuevoTercero />} />
             </Routes>
           </Layout>
         </DashboardProvider>

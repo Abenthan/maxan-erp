@@ -22,6 +22,7 @@ const groups: NavGroup[] = [
       { to: "/facturas", label: "Facturación", icon: "📄" },
       { to: "/ventas-items", label: "Ventas Items", icon: "📋" },
       { to: "/nueva-venta", label: "Nueva Venta", icon: "➕" },
+      { to: "/terceros", label: "Terceros", icon: "👤" },
     ],
   },
   {
@@ -38,6 +39,7 @@ const groups: NavGroup[] = [
     items: [
       { to: "/cartera", label: "Cartera", icon: "📋" },
       { to: "/cartera/pagos", label: "Pagos", icon: "💳" },
+      { to: "/cartera/retenciones", label: "Retenciones", icon: "🧾" },
     ],
   },
   {

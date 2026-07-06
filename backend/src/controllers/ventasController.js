@@ -121,6 +121,15 @@ async function create(req, res) {
     const receptorResult = await client.query(upsertQ, receptorVals);
     const receptorId = receptorResult.rows[0].id;
 
+    const emisorResult = await client.query(
+      `SELECT id FROM facturacion.terceros WHERE es_propio = true LIMIT 1`
+    );
+    if (emisorResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "No hay un emisor configurado. Cree un tercero con la opción 'Propio' activada." });
+    }
+    const emisorId = emisorResult.rows[0].id;
+
     const subtotal = items.reduce((s, it) => s + (it.valor_linea || 0), 0);
     const total = items.reduce((s, it) => s + (it.valor_total || it.valor_linea || 0), 0);
 
@@ -139,7 +148,7 @@ async function create(req, res) {
         subtotal,
         valorFinal,
         valorFinal,
-        1,
+        emisorId,
         receptorId,
         "pendiente_pago",
       ]

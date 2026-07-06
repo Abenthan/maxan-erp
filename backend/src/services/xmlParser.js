@@ -136,6 +136,21 @@ function extractLines(invoiceLines) {
   for (const line of lines) {
     const item = line.Item || {};
     const price = line.Price || {};
+
+    let valor_retencion_fuente = 0;
+    const lineWithholding = line.WithholdingTaxTotal;
+    if (lineWithholding) {
+      const wtSubtotals = safeArray(lineWithholding.TaxSubtotal);
+      for (const wt of wtSubtotals) {
+        const wtCategory = wt.TaxCategory;
+        const wtScheme = wtCategory?.TaxScheme;
+        const wtId = getText(wtScheme?.ID) || "";
+        if (wtId === "01") {
+          valor_retencion_fuente += parseFloat(getText(wt.TaxAmount)) || 0;
+        }
+      }
+    }
+
     items.push({
       numero_linea: parseInt(getText(line.ID)) || 0,
       descripcion: getText(item.Description) || "",
@@ -146,9 +161,36 @@ function extractLines(invoiceLines) {
       porcentaje_descuento: 0,
       valor_descuento: 0,
       valor_linea: parseFloat(getText(line.LineExtensionAmount)) || 0,
+      valor_retencion_fuente,
     });
   }
   return items;
+}
+
+function extractWithholdingTax(withholdingTotal, invoiceLines) {
+  let valor_retencion_fuente = 0;
+  let valor_retencion_iva = 0;
+  let valor_retencion_ica = 0;
+
+  if (!withholdingTotal) return { valor_retencion_fuente, valor_retencion_iva, valor_retencion_ica };
+
+  const wtTotals = safeArray(Array.isArray(withholdingTotal) ? withholdingTotal : [withholdingTotal]);
+
+  for (const wt of wtTotals) {
+    const subtotals = safeArray(wt.TaxSubtotal);
+    for (const st of subtotals) {
+      const wtCategory = st.TaxCategory;
+      const wtScheme = wtCategory?.TaxScheme;
+      const wtId = getText(wtScheme?.ID) || "";
+      const taxAmount = parseFloat(getText(st.TaxAmount)) || 0;
+
+      if (wtId === "01") valor_retencion_fuente += taxAmount;
+      else if (wtId === "02") valor_retencion_iva += taxAmount;
+      else if (wtId === "04") valor_retencion_ica += taxAmount;
+    }
+  }
+
+  return { valor_retencion_fuente, valor_retencion_iva, valor_retencion_ica };
 }
 
 function extractInvoiceControl(extensions) {
@@ -298,6 +340,22 @@ function parseInvoiceXML(xmlString) {
     extractTaxes(taxTotal, invoiceLines);
 
   const items = extractLines(invoiceLines);
+
+  const withholding = invoice.WithholdingTaxTotal;
+  const retenciones = extractWithholdingTax(withholding, invoiceLines);
+
+  const hasPerItemRetenciones = items.some((it) => it.valor_retencion_fuente > 0);
+  if (!hasPerItemRetenciones && retenciones.valor_retencion_fuente > 0 && items.length > 0) {
+    const subtotalTotal = items.reduce((s, it) => s + (it.valor_linea || 0), 0);
+    if (subtotalTotal > 0) {
+      for (const item of items) {
+        item.valor_retencion_fuente = Math.round(
+          (retenciones.valor_retencion_fuente * (item.valor_linea / subtotalTotal)) * 100
+        ) / 100;
+      }
+    }
+  }
+
   const totals = extractTotals(monetaryTotal);
 
   const paymentMeansList = safeArray(paymentMeans);
@@ -333,9 +391,7 @@ function parseInvoiceXML(xmlString) {
     valor_iva,
     valor_inc,
     valor_ica,
-    valor_retencion_fuente: 0,
-    valor_retencion_iva: 0,
-    valor_retencion_ica: 0,
+    ...retenciones,
     valor_anticipos: 0,
     medio_pago_code: medioPago,
     fecha_vencimiento_pago: fechaVencPago || getText(invoice.DueDate) || "",

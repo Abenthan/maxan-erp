@@ -17,6 +17,7 @@ interface FacturaPendiente {
   fecha_vencimiento_pago: string | null;
   valor_a_pagar: string;
   saldo_pendiente: string;
+  valor_retencion_fuente: string;
 }
 
 interface MedioPago {
@@ -54,6 +55,7 @@ export default function NuevoPago() {
   const [referencia, setReferencia] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [aplicaciones, setAplicaciones] = useState<Record<number, string>>({});
+  const [retenciones, setRetenciones] = useState<Record<number, string>>({});
   const [valorTotal, setValorTotal] = useState("");
   const [guardando, setGuardando] = useState(false);
 
@@ -67,6 +69,11 @@ export default function NuevoPago() {
       .finally(() => setLoading(false));
   }, [api]);
 
+  function saldoNeto(f: FacturaPendiente, retencionManual = 0): number {
+    const ret = retencionManual || Number(f.valor_retencion_fuente || 0);
+    return Math.max(Number(f.saldo_pendiente) - ret, 0);
+  }
+
   const handleClienteChange = async (id: string) => {
     setClienteId(id);
     if (!id) return;
@@ -78,9 +85,10 @@ export default function NuevoPago() {
       const facs = await api.get<FacturaPendiente[]>(`/cartera/clientes-deuda/${id}/facturas`);
       setFacturas(facs);
       const apps: Record<number, string> = {};
-      const totalDeuda = facs.reduce((s, f) => s + Number(f.saldo_pendiente), 0);
-      facs.forEach((f) => { apps[f.venta_id] = f.saldo_pendiente; });
+      const totalDeuda = facs.reduce((s, f) => s + saldoNeto(f), 0);
+      facs.forEach((f) => { apps[f.venta_id] = String(saldoNeto(f)); });
       setAplicaciones(apps);
+      setRetenciones({});
       setValorTotal(totalDeuda.toString());
     } catch (e: any) {
       setError(e.message || "Error al cargar facturas");
@@ -89,8 +97,26 @@ export default function NuevoPago() {
     }
   };
 
+  const handleRetencionChange = (ventaId: number, valor: string) => {
+    const f = facturas.find((ff) => ff.venta_id === ventaId);
+    if (!f) return;
+    const ret = Math.min(Math.max(parseFloat(valor) || 0, 0), Number(f.saldo_pendiente));
+    const nuevasRet = { ...retenciones, [ventaId]: String(ret) };
+    setRetenciones(nuevasRet);
+    const neto = saldoNeto(f, ret);
+    const nuevasApps = { ...aplicaciones, [ventaId]: String(Math.min(parseFloat(aplicaciones[ventaId] || "0"), neto)) };
+    setAplicaciones(nuevasApps);
+    const total = Object.values(nuevasApps).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+    setValorTotal(total.toString());
+  };
+
   const handleAplicacionChange = (ventaId: number, valor: string) => {
-    const nuevas = { ...aplicaciones, [ventaId]: valor };
+    const f = facturas.find((ff) => ff.venta_id === ventaId);
+    if (!f) return;
+    const ret = parseFloat(retenciones[ventaId] || "0");
+    const maxNeto = Math.max(Number(f.saldo_pendiente) - ret, 0);
+    const v = Math.min(Math.max(parseFloat(valor) || 0, 0), maxNeto);
+    const nuevas = { ...aplicaciones, [ventaId]: String(v || "0") };
     setAplicaciones(nuevas);
     const total = Object.values(nuevas).reduce((s, v) => s + (parseFloat(v) || 0), 0);
     setValorTotal(total.toString());
@@ -99,7 +125,8 @@ export default function NuevoPago() {
   const distribuirPorcentaje = (pct: number) => {
     const nuevas: Record<number, string> = {};
     facturas.forEach((f) => {
-      nuevas[f.venta_id] = ((Number(f.saldo_pendiente) * pct) / 100).toFixed(2);
+      const ret = parseFloat(retenciones[f.venta_id] || "0");
+      nuevas[f.venta_id] = ((saldoNeto(f, ret) * pct) / 100).toFixed(2);
     });
     setAplicaciones(nuevas);
     const total = Object.values(nuevas).reduce((s, v) => s + (parseFloat(v) || 0), 0);
@@ -115,7 +142,11 @@ export default function NuevoPago() {
     try {
       const apps = Object.entries(aplicaciones)
         .filter(([, v]) => parseFloat(v) > 0)
-        .map(([ventaId, valor]) => ({ venta_id: parseInt(ventaId, 10), valor_aplicado: parseFloat(valor) }));
+        .map(([ventaId, valor]) => ({
+          venta_id: parseInt(ventaId, 10),
+          valor_aplicado: parseFloat(valor),
+          retencion: parseFloat(retenciones[ventaId] || "0") || undefined,
+        }));
 
       await api.post("/cartera/pagos", {
         cliente_id: parseInt(clienteId, 10),
@@ -210,30 +241,45 @@ export default function NuevoPago() {
                       <th className="p-3 font-semibold text-gray-600">Vcto</th>
                       <th className="p-3 font-semibold text-gray-600 text-right">Original</th>
                       <th className="p-3 font-semibold text-gray-600 text-right">Saldo</th>
+                      <th className="p-3 font-semibold text-gray-600 text-right">Retención</th>
                       <th className="p-3 font-semibold text-gray-600 text-right">A pagar</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {facturas.map((f) => (
-                      <tr key={f.venta_id} className="border-b hover:bg-gray-50">
-                        <td className="p-3 font-medium">{f.numero_completo}</td>
-                        <td className="p-3 text-gray-600">{formatDate(f.fecha_emision)}</td>
-                        <td className="p-3 text-gray-600">{f.fecha_vencimiento_pago ? formatDate(f.fecha_vencimiento_pago) : "-"}</td>
-                        <td className="p-3 text-right">{formatCurrency(Number(f.valor_a_pagar))}</td>
-                        <td className="p-3 text-right font-medium">{formatCurrency(Number(f.saldo_pendiente))}</td>
-                        <td className="p-3 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max={f.saldo_pendiente}
-                            value={aplicaciones[f.venta_id] || ""}
-                            onChange={(e) => handleAplicacionChange(f.venta_id, e.target.value)}
-                            className="w-28 px-2 py-1 text-xs border border-gray-300 rounded text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {facturas.map((f) => {
+                      const ret = parseFloat(retenciones[f.venta_id] || "0") || Number(f.valor_retencion_fuente || 0);
+                      return (
+                        <tr key={f.venta_id} className="border-b hover:bg-gray-50">
+                          <td className="p-3 font-medium">{f.numero_completo}</td>
+                          <td className="p-3 text-gray-600">{formatDate(f.fecha_emision)}</td>
+                          <td className="p-3 text-gray-600">{f.fecha_vencimiento_pago ? formatDate(f.fecha_vencimiento_pago) : "-"}</td>
+                          <td className="p-3 text-right">{formatCurrency(Number(f.valor_a_pagar))}</td>
+                          <td className="p-3 text-right font-medium">{formatCurrency(Number(f.saldo_pendiente))}</td>
+                          <td className="p-3 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0"
+                              value={retenciones[f.venta_id] || ""}
+                              onChange={(e) => handleRetencionChange(f.venta_id, e.target.value)}
+                              className="w-20 px-2 py-1 text-xs border border-gray-300 rounded text-right focus:outline-none focus:ring-2 focus:ring-orange-500 text-orange-600"
+                            />
+                          </td>
+                          <td className="p-3 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max={saldoNeto(f, ret)}
+                              value={aplicaciones[f.venta_id] || ""}
+                              onChange={(e) => handleAplicacionChange(f.venta_id, e.target.value)}
+                              className="w-28 px-2 py-1 text-xs border border-gray-300 rounded text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}

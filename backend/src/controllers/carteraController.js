@@ -43,7 +43,7 @@ async function getPago(req, res) {
   try {
     const { id } = req.params;
     const pagoResult = await pool.query(
-      "SELECT * FROM cartera.vw_pagos_resumen WHERE id = $1",
+      "SELECT pr.*, p.medio_pago_id, p.observaciones FROM cartera.vw_pagos_resumen pr JOIN cartera.pagos p ON p.id = pr.id WHERE pr.id = $1",
       [id]
     );
     if (pagoResult.rows.length === 0) {
@@ -85,6 +85,17 @@ async function createPago(req, res) {
     }
 
     await client.query("BEGIN");
+
+    // Guardar retención a nivel factura
+    for (const app of aplicaciones) {
+      const retencion = parseFloat(app.retencion) || 0;
+      if (retencion > 0 && app.venta_id) {
+        await client.query(
+          `UPDATE facturacion.ventas SET valor_retencion_fuente = $1 WHERE id = $2`,
+          [retencion, app.venta_id]
+        );
+      }
+    }
 
     const pagoResult = await client.query(
       `INSERT INTO cartera.pagos (cliente_id, medio_pago_id, referencia, fecha_pago, valor_total, observaciones)
@@ -134,6 +145,49 @@ async function createPago(req, res) {
     res.status(500).json({ error: error.message });
   } finally {
     client.release();
+  }
+}
+
+async function updatePago(req, res) {
+  const pool = getPool(req);
+  try {
+    const { id } = req.params;
+    const { fecha_pago, medio_pago_id, referencia, observaciones } = req.body;
+
+    const existente = await pool.query(
+      "SELECT * FROM cartera.pagos WHERE id = $1",
+      [id]
+    );
+    if (existente.rows.length === 0) {
+      return res.status(404).json({ error: "Pago no encontrado" });
+    }
+    if (existente.rows[0].anulado) {
+      return res.status(400).json({ error: "No se puede editar un pago anulado" });
+    }
+
+    const result = await pool.query(
+      `UPDATE cartera.pagos
+       SET fecha_pago = $1, medio_pago_id = $2, referencia = $3, observaciones = $4, updated_at = now()
+       WHERE id = $5
+       RETURNING *`,
+      [
+        fecha_pago || existente.rows[0].fecha_pago,
+        medio_pago_id || null,
+        referencia !== undefined ? referencia : existente.rows[0].referencia,
+        observaciones !== undefined ? observaciones : existente.rows[0].observaciones,
+        id,
+      ]
+    );
+
+    const completo = await pool.query(
+      "SELECT * FROM cartera.vw_pagos_resumen WHERE id = $1",
+      [id]
+    );
+
+    res.json(completo.rows[0]);
+  } catch (error) {
+    console.error("Error al actualizar pago:", error.message);
+    res.status(500).json({ error: error.message });
   }
 }
 
@@ -281,6 +335,7 @@ async function getFacturasPendientesCliente(req, res) {
     const result = await pool.query(
       `SELECT v.id AS venta_id, v.numero_completo, v.fecha_emision,
               v.fecha_vencimiento_pago, v.valor_a_pagar,
+              v.valor_retencion_fuente,
               COALESCE(v.saldo_pendiente, v.valor_a_pagar) AS saldo_pendiente
        FROM facturacion.ventas v
        WHERE v.receptor_id = $1
@@ -296,14 +351,42 @@ async function getFacturasPendientesCliente(req, res) {
   }
 }
 
+async function listRetenciones(req, res) {
+  const pool = getPool(req);
+  try {
+    const result = await pool.query(
+      `SELECT
+         v.id AS venta_id,
+         v.numero_completo,
+         t.razon_social AS cliente,
+         t.numero_documento AS nit_cliente,
+         v.fecha_emision,
+         v.valor_a_pagar,
+         v.valor_retencion_fuente AS retencion_total,
+         v.estado,
+         v.saldo_pendiente
+       FROM facturacion.ventas v
+       JOIN facturacion.terceros t ON t.id = v.receptor_id
+       WHERE v.valor_retencion_fuente > 0
+       ORDER BY v.fecha_emision DESC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al listar retenciones:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
 module.exports = {
   listPagos,
   getPago,
   createPago,
+  updatePago,
   anularPago,
   listCarteraActiva,
   listMediosPago,
   createMedioPago,
   listClientesConDeuda,
   getFacturasPendientesCliente,
+  listRetenciones,
 };
