@@ -89,6 +89,8 @@
 12. **Filtro cliente en Cartera como input** → se cambió de `<select>` a `<input>` con filtrado client-side por nombre/NIT, eliminando dependencia de `/cartera/clientes-deuda`
 13. **Medios de pago limitados** → en Cartera y Pagos solo se muestran Efectivo y Transferencia Bancaria, default Transferencia
 14. **Edición de pagos** → se agregó `PUT /api/cartera/pagos/:id` y modal de edición en Pagos.tsx al hacer click en fila activa
+15. **Retenciones en pagos** — columna editable "Retención" en modal de pago (Cartera.tsx y NuevoPago.tsx). Al pagar se guarda `ventas.valor_retencion_fuente`. El trigger descuenta retención del saldo: si `pago + retención >= total` → factura pagada. Migración `11_retenciones_ventas_items.sql`: columna en `ventas_items`, trigger y vistas actualizados.
+16. **Página Retenciones** — `/cartera/retenciones` lista facturas con retención > 0 con total acumulado.
 
 ## Cálculo de utilidad (`vw_utilidad_productos`)
 - **costo_adquisiciones** = SUM(entradas.cantidad × costo_unitario) — todo lo que entró a inventario (gastos Suministros que generan entrada via trigger)

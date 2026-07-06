@@ -20,6 +20,15 @@ interface DashboardData {
     producto_id: number; codigo: string; nombre: string;
     costo_adquisiciones: number; ingreso_ventas: number; otros_costos: number; utilidad: number;
   }[];
+  cartera: {
+    total_cartera: number;
+    facturas_en_cartera: number;
+    facturas_con_saldo: number;
+    total_vencido: number;
+    facturas_vencidas: number;
+    proximos_a_vencer: number;
+    total_por_vencer: number;
+  };
 }
 
 interface Cliente {
@@ -167,6 +176,30 @@ export default function Dashboard() {
               <div className={`text-2xl font-bold ${data.resumen.margen_porcentaje >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {data.resumen.margen_porcentaje}%
               </div>
+            </div>
+          </div>
+
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">Cartera</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="text-xs text-gray-500 mb-1">Saldo por Cobrar</div>
+              <div className="text-2xl font-bold text-purple-600">{formatCurrency(data.cartera.total_cartera)}</div>
+              <div className="text-xs text-gray-400 mt-1">{data.cartera.facturas_con_saldo} facturas pendientes</div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="text-xs text-gray-500 mb-1">Vencido</div>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(data.cartera.total_vencido)}</div>
+              <div className="text-xs text-gray-400 mt-1">{data.cartera.facturas_vencidas} facturas vencidas</div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="text-xs text-gray-500 mb-1">Por Vencer (30 días)</div>
+              <div className="text-2xl font-bold text-emerald-600">{formatCurrency(data.cartera.total_por_vencer)}</div>
+              <div className="text-xs text-gray-400 mt-1">{data.cartera.proximos_a_vencer} facturas</div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="text-xs text-gray-500 mb-1">Facturas en Cartera</div>
+              <div className="text-2xl font-bold text-purple-700">{data.cartera.facturas_en_cartera}</div>
+              <div className="text-xs text-gray-400 mt-1">total registros</div>
             </div>
           </div>
 

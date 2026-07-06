@@ -35,7 +35,7 @@ async function dashboard(req, res) {
     const ventasWhere = ventasFilter.length > 0 ? "WHERE " + ventasFilter.join(" AND ") : "";
     const gastosWhere = gastosFilter.length > 0 ? "WHERE " + gastosFilter.join(" AND ") : "";
 
-    const [ventasRes, gastosRes, ventasMesRes, gastosMesRes, clasifRes, topClientesRes, ultimasRes, clientesRes, productosRes] = await Promise.all([
+    const [ventasRes, gastosRes, ventasMesRes, gastosMesRes, clasifRes, topClientesRes, ultimasRes, clientesRes, productosRes, carteraRes, vencidoRes, proximosRes] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int AS cantidad, COALESCE(SUM(valor_a_pagar),0) AS total FROM facturacion.ventas v ${ventasWhere}`, params),
       pool.query(`SELECT COUNT(*)::int AS cantidad, COALESCE(SUM(valor_total),0) AS total FROM gastos.gastos g ${gastosWhere}`, params),
       pool.query(`
@@ -78,6 +78,32 @@ async function dashboard(req, res) {
         ORDER BY razon_social
       `),
       pool.query(`SELECT * FROM inventario.vw_utilidad_productos ORDER BY ingreso_ventas DESC LIMIT 10`),
+      pool.query(`
+        SELECT COUNT(*)::int AS cantidad_facturas,
+               COUNT(*) FILTER (WHERE COALESCE(saldo_pendiente, valor_a_pagar) > 0)::int AS con_saldo,
+               COALESCE(SUM(COALESCE(saldo_pendiente, valor_a_pagar)),0) AS saldo_total
+        FROM facturacion.ventas
+        WHERE estado NOT IN ('anulada', 'rechazada', 'pagada')
+      `),
+      pool.query(`
+        SELECT COALESCE(SUM(COALESCE(saldo_pendiente, valor_a_pagar)),0) AS total_vencido,
+               COUNT(*)::int AS cantidad_vencidas
+        FROM facturacion.ventas
+        WHERE estado NOT IN ('anulada', 'rechazada', 'pagada')
+          AND fecha_vencimiento_pago IS NOT NULL
+          AND CURRENT_DATE > fecha_vencimiento_pago
+          AND COALESCE(saldo_pendiente, valor_a_pagar) > 0
+      `),
+      pool.query(`
+        SELECT COUNT(*)::int AS cantidad_por_vencer,
+               COALESCE(SUM(COALESCE(saldo_pendiente, valor_a_pagar)),0) AS total_por_vencer
+        FROM facturacion.ventas
+        WHERE estado NOT IN ('anulada', 'rechazada', 'pagada')
+          AND fecha_vencimiento_pago IS NOT NULL
+          AND CURRENT_DATE <= fecha_vencimiento_pago
+          AND fecha_vencimiento_pago <= CURRENT_DATE + INTERVAL '30 days'
+          AND COALESCE(saldo_pendiente, valor_a_pagar) > 0
+      `),
     ]);
 
     const totalVentas = parseFloat(ventasRes.rows[0].total);
@@ -100,6 +126,15 @@ async function dashboard(req, res) {
       ultimas_facturas: ultimasRes.rows,
       clientes: clientesRes.rows,
       productos_utilidad: productosRes.rows,
+      cartera: {
+        total_cartera: parseFloat(carteraRes.rows[0].saldo_total),
+        facturas_en_cartera: carteraRes.rows[0].cantidad_facturas,
+        facturas_con_saldo: carteraRes.rows[0].con_saldo,
+        total_vencido: parseFloat(vencidoRes.rows[0].total_vencido),
+        facturas_vencidas: vencidoRes.rows[0].cantidad_vencidas,
+        proximos_a_vencer: proximosRes.rows[0].cantidad_por_vencer,
+        total_por_vencer: parseFloat(proximosRes.rows[0].total_por_vencer),
+      },
     });
   } catch (error) {
     console.error("Error en dashboard:", error.message);
