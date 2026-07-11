@@ -14,6 +14,7 @@ interface FacturaDetalle {
   nit_receptor: string;
   valor_a_pagar: string;
   estado: string;
+  observaciones: string | null;
   items: {
     id: number;
     numero_linea: number;
@@ -85,6 +86,9 @@ export default function Factura() {
           <p><span className="font-semibold">Fecha de emisión:</span> {new Date(factura.fecha_emision).toLocaleDateString("es-CO")}</p>
           {factura.fecha_vencimiento && (
             <p><span className="font-semibold">Fecha de vencimiento:</span> {new Date(factura.fecha_vencimiento).toLocaleDateString("es-CO")}</p>
+          )}
+          {factura.observaciones && (
+            <p><span className="font-semibold">Observaciones:</span> {factura.observaciones}</p>
           )}
           <p>
             <span className="font-semibold">Estado: </span>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
+import { usePermiso } from "../context/AuthContext";
 
 interface Tercero {
   id: number;
@@ -21,6 +22,7 @@ interface Tercero {
 export default function Terceros() {
   const api = useApi();
   const navigate = useNavigate();
+  const puedeGestionar = usePermiso("terceros.gestionar");
   const [terceros, setTerceros] = useState<Tercero[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -74,12 +76,14 @@ export default function Terceros() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Terceros</h1>
-        <button
-          onClick={() => navigate("/nuevo-tercero")}
-          className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
-        >
-          + Nuevo
-        </button>
+        {puedeGestionar && (
+          <button
+            onClick={() => navigate("/nuevo-tercero")}
+            className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
+          >
+            + Nuevo
+          </button>
+        )}
       </div>
 
       {error && (
@@ -128,8 +132,8 @@ export default function Terceros() {
                 terceros.map((t) => (
                   <tr
                     key={t.id}
-                    onClick={() => abrirModal(t)}
-                    className="border-b hover:bg-gray-50 cursor-pointer"
+                    onClick={() => puedeGestionar && abrirModal(t)}
+                    className={`border-b hover:bg-gray-50 ${puedeGestionar ? "cursor-pointer" : ""}`}
                   >
                     <td className="p-3">
                       <span className="text-xs text-gray-500">{t.tipo_documento === "13" ? "CC" : t.tipo_documento === "31" ? "NIT" : t.tipo_documento}</span>
@@ -147,7 +151,7 @@ export default function Terceros() {
         </div>
       </div>
 
-      {modalAbierto && (
+      {puedeGestionar && modalAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={cerrarModal}>
           <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">

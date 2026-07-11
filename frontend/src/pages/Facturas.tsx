@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { useApi } from "../context/ApiContext";
+import { usePermiso } from "../context/AuthContext";
 
 interface FacturaResumen {
   id: number;
@@ -37,11 +38,13 @@ export default function Facturas() {
   const [facturas, setFacturas] = useState<FacturaResumen[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [searchNumero, setSearchNumero] = useState("");
-  const [searchCliente, setSearchCliente] = useState("");
+  const [search, setSearch] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("fecha_emision");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const api = useApi();
+  const puedeCrear = usePermiso("facturas.crear");
 
   useEffect(() => {
     api.get<FacturaResumen[]>("/facturas")
@@ -61,11 +64,14 @@ export default function Facturas() {
 
   const filtradas = useMemo(() => {
     const filtered = facturas.filter((f) => {
-      const matchNumero = !searchNumero
-        || f.numero_completo.toLowerCase().includes(searchNumero.toLowerCase());
-      const matchCliente = !searchCliente
-        || f.receptor.toLowerCase().includes(searchCliente.toLowerCase());
-      return matchNumero && matchCliente;
+      const q = search.toLowerCase();
+      const matchSearch = !search
+        || f.numero_completo.toLowerCase().includes(q)
+        || f.receptor.toLowerCase().includes(q)
+        || f.nit_receptor.includes(q);
+      const matchFecha = (!fechaDesde || f.fecha_emision >= fechaDesde)
+        && (!fechaHasta || f.fecha_emision <= fechaHasta + "T23:59:59");
+      return matchSearch && matchFecha;
     });
 
     return [...filtered].sort((a, b) => {
@@ -89,7 +95,7 @@ export default function Facturas() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [facturas, searchNumero, searchCliente, sortKey, sortDir]);
+  }, [facturas, search, fechaDesde, fechaHasta, sortKey, sortDir]);
 
   function SortIcon({ column }: { column: SortKey }) {
     if (sortKey !== column) return <span className="text-gray-300 ml-1">↕</span>;
@@ -135,30 +141,48 @@ export default function Facturas() {
             </svg>
             Exportar Excel
           </button>
-          <Link
-            to="/nueva-factura"
-            className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
-          >
-            + Nueva
-          </Link>
+          {puedeCrear && (
+            <Link
+              to="/nueva-factura"
+              className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
+            >
+              + Nueva
+            </Link>
+          )}
         </div>
       </div>
 
-      <div className="flex gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <input
           type="text"
-          placeholder="Buscar por N° factura..."
-          value={searchNumero}
-          onChange={(e) => setSearchNumero(e.target.value)}
-          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Buscar por factura, cliente o NIT..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         <input
-          type="text"
-          placeholder="Buscar por cliente..."
-          value={searchCliente}
-          onChange={(e) => setSearchCliente(e.target.value)}
-          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          type="date"
+          value={fechaDesde}
+          onChange={(e) => setFechaDesde(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          title="Fecha desde"
         />
+        <span className="text-gray-400 text-sm">—</span>
+        <input
+          type="date"
+          value={fechaHasta}
+          onChange={(e) => setFechaHasta(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          title="Fecha hasta"
+        />
+        {(search || fechaDesde || fechaHasta) && (
+          <button
+            onClick={() => { setSearch(""); setFechaDesde(""); setFechaHasta(""); }}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+          >
+            Limpiar
+          </button>
+        )}
       </div>
 
       {filtradas.length === 0 ? (

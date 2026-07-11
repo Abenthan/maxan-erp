@@ -14,6 +14,7 @@
   📄 Facturación
   📋 Ventas Items
   ➕ Nueva Venta
+  👤 Terceros
 ── COSTOS ──        (bg-orange-50)
   📥 Compras
   💰 Gastos
@@ -41,7 +42,7 @@
 - **Compras** — `routes/compras.js` → `POST /api/compras/upload` (multer + reuso de `parseInvoiceXML`), `POST /api/compras/parsear-xml` (solo parseo, sin guardar), `GET /api/compras`
   - Al guardar una compra, por cada línea crea un gasto en `gastos.gastos` y por cada impuesto (>0) crea un gasto adicional distribuido proporcionalmente según `item.valor_linea / subtotal_total`
 - **Inventario** — `routes/inventario.js` → `GET /api/inventario/stock`, `GET /api/inventario/movimientos/:producto_id`, `POST /api/inventario/consumir` (FIFO transaccional)
-- **Ventas** — `routes/ventas.js` → `GET /api/ventas/items`, `PUT /api/ventas/items/:id` (asignar producto_id), `POST /api/ventas` (crear)
+- **Ventas** — `routes/ventas.js` → `GET /api/ventas/items`, `PUT /api/ventas/items/:id` (asignar producto_id), `POST /api/ventas` (crear), `GET /api/ventas/:id` (obtener con items), `PUT /api/ventas/:id` (editar solo si cufe IS NULL)
 - **Utilidad** — `routes/facturacion.js` → `GET /api/facturacion/:factura_id/utilidad`, `GET /api/facturacion/utilidad/productos`
 - **Categorías** — `routes/categorias.js` → `GET/POST/DELETE /api/productos/categorias` (maestro de categorías)
 - **Dashboard** — `routes/dashboard.js` → `GET /api/dashboard` con filtros `?mes=&cliente_id=&factura_id=`
@@ -55,7 +56,7 @@
 - `pages/Compras.tsx` — Listado de facturas compra
 - `pages/NuevaCompra.tsx` — Subir XML de compra con preview + botón guardar (paso doble: parsear → mostrar → guardar)
 - `pages/Inventario.tsx` — Stock desde `vw_stock_disponible`
-- `pages/VentasItems.tsx` — Items de venta con filtros, dropdown de producto por fila + botón Consumir stock (PUT item + POST consumir), badge "Consumido"
+- `pages/VentasItems.tsx` — Items de venta con filtros, modal asignar producto con consumo FIFO, botones Ver, Gastos y Editar (solo para ventas sin factura, identificadas por `cufe IS NULL`)
 - `pages/Utilidad.tsx` — Dos tabs: Por Producto (tabla desde vw_utilidad_productos) y Por Factura (input ID + resumen + detalle líneas)
 - `pages/Terceros.tsx` — `/terceros` CRUD completo con tabla, filtro búsqueda, fila clickeable → modal edición, eliminar
 - `pages/NuevoTercero.tsx` — `/nuevo-tercero` Formulario para crear nuevo tercero
@@ -63,16 +64,83 @@
 - `pages/Pagos.tsx` — `/cartera/pagos` Historial de pagos recibidos. Click en fila activa → modal de edición (fecha, medio, referencia, observaciones) con PUT. Botón anular preservado.
 - `pages/NuevoPago.tsx` — `/cartera/nuevo-pago` Página dedicada paso a paso (cliente → facturas → confirmar)
 - `pages/Retenciones.tsx` — `/cartera/retenciones` Listado de retenciones realizadas con total acumulado
+- `pages/NuevaVenta.tsx` — `/nueva-venta` y `/nueva-venta/:id` (edición). Cliente default "Ventas sin factura" con CC 123456789. Campo Observaciones con auto-focus. Items con dos columnas: Código (input, al perder foco busca producto por código exacto) y Producto (autocomplete por código/nombre). Si el producto es inventariable, al crear consume inventario. En modo edición carga datos vía GET y guarda con PUT.
 - `context/ApiContext.tsx` — Métodos: `get`, `post`, `put`, `del`, `postXml`, `upload`
+- `context/AuthContext.tsx` — Provider con `user`, `token`, `login()`, `logout()`, `hasPermiso()`. Hook `usePermiso(codigo)` y `useAuth()`. Detecta `isFirstRun` automáticamente.
+
+## Autenticación y permisos
+
+### Módulo de usuarios (implementado)
+- **Schema**: `usuarios` con tablas `empresas`, `usuarios`, `roles`, `permisos`, `roles_permisos`, `usuarios_roles`
+- **Backend**: JWT con jsonwebtoken + bcrypt. Middleware `authenticate` (verifica token) y `authorize(...permisos)` (control granular).
+  - `routes/auth.js` — Login público, register (solo primer usuario), me, change-password
+  - `routes/usuarios.js` — CRUD usuarios + asignar roles (solo admin)
+  - `routes/roles.js` — CRUD roles + asignar permisos (solo admin)
+  - `routes/permisos.js` — CRUD permisos (solo admin)
+- **Seed automático**: al iniciar servidor, crea 19 permisos + 3 roles (Administrador, Operador, Consultor).
+- **Protección**: todas las rutas `/api/*` (excepto auth/health) requieren `authenticate`. Control granular por permiso en cada endpoint.
+
+### 19 permisos del sistema
+| Código | Módulo | Descripción |
+|--------|--------|-------------|
+| `dashboard.ver` | Dashboard | Ver dashboard |
+| `facturas.ver` | Facturación | Ver facturas |
+| `facturas.crear` | Facturación | Subir XML factura |
+| `ventas.ver` | Ventas | Ver items de venta |
+| `ventas.crear` | Ventas | Crear/editar ventas manuales |
+| `productos.ver` | Productos | Ver catálogo |
+| `productos.gestionar` | Productos | Crear/editar productos |
+| `gastos.ver` | Gastos | Ver gastos |
+| `gastos.gestionar` | Gastos | Crear/editar/eliminar gastos |
+| `compras.ver` | Compras | Ver compras |
+| `compras.crear` | Compras | Subir XML compra |
+| `inventario.ver` | Inventario | Ver stock y movimientos |
+| `inventario.gestionar` | Inventario | Consumir inventario |
+| `cartera.ver` | Cartera | Ver cartera y pagos |
+| `cartera.gestionar` | Cartera | Registrar/anular pagos |
+| `terceros.ver` | Terceros | Ver terceros |
+| `terceros.gestionar` | Terceros | Crear/editar/eliminar terceros |
+| `utilidad.ver` | Utilidad | Ver reporte de utilidad |
+| `usuarios.gestionar` | Admin | Gestionar usuarios, roles y permisos |
+
+### Frontend — páginas de administración
+- `pages/Login.tsx` — `/login` Formulario login. Link a `/register` si es primera vez.
+- `pages/Register.tsx` — `/register` Registro primer usuario (crea empresa + admin). Solo accesible si no hay usuarios.
+- `pages/Usuarios.tsx` — `/usuarios` CRUD usuarios con asignación de roles. Solo admin.
+- `pages/Roles.tsx` — `/roles` CRUD roles con asignación de permisos por módulo. Solo admin.
+- `components/ProtectedRoute.tsx` — Wrapper de rutas. Redirige a `/login` si no autenticado. Acepta `permiso` opcional.
+
+### Frontend — ocultación condicional por permisos
+- Botones "Nuevo", "Editar", "Eliminar" y formularios de creación se ocultan según `usePermiso("codigo")` en cada página.
+- Sidebar filtra secciones enteras si el usuario no tiene el permiso `*.ver` correspondiente.
+- Header muestra links "Usuarios" y "Roles" solo para admin (`usuarios.gestionar`).
+
+### Flujo first-run
+1. AuthProvider detecta `isFirstRun` vía `GET /api/auth/check-first-run`
+2. Si `true`, redirige a `/register`
+3. Formulario crea empresa + usuario admin con rol Administrador
+4. Redirige a `/login`
+5. Login devuelve JWT (8h de expiración) almacenado en localStorage
+
+### Token JWT
+- Contenido: `{ id, empresa_id, username, nombres, apellidos, roles[], permisos[] }`
+- Expiración: 8 horas
+- Envío: `Authorization: Bearer <token>` en cada request vía interceptor de axios
 
 ## Schemas SQL
 - `db/01_schema.sql` — Schema `facturacion` (aplicado)
 - `db/02_compras_gastos_inventario.sql` — Schemas `compras`, `inventario`, `gastos` con tablas, triggers, vistas (`vw_stock_disponible`, `vw_utilidad_items`, `vw_utilidad_productos`) — **YA aplicado**
-- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`, `10_cufe_nullable.sql`, `11_retenciones_ventas_items.sql`
+- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`, `10_cufe_nullable.sql`, `11_retenciones_ventas_items.sql`, `12_observaciones_ventas.sql`, `13_secuencia_ventas_manual.sql`, `14_vw_facturas_resumen_observaciones.sql`, `15_modulo_usuarios.sql`
 
 ## Dependencias adicionales
+### Backend
 - `multer` (upload XML en compras)
+- `jsonwebtoken` + `bcrypt` (autenticación JWT)
+- `cors` (CORS middleware)
+### Frontend
 - `xlsx` (exportar Excel en facturas)
+- `axios` (API calls, ya incluido)
+- `react-router-dom` (ruteo, ya incluido)
 
 ## Problemas resueltos
 1. **CUFE no encontrado** → búsqueda en `InvoiceControl.UUID/CUFE/CUDE` y fallback en `Invoice.UUID/CUFE/CUDE`
@@ -91,6 +159,13 @@
 14. **Edición de pagos** → se agregó `PUT /api/cartera/pagos/:id` y modal de edición en Pagos.tsx al hacer click en fila activa
 15. **Retenciones en pagos** — columna editable "Retención" en modal de pago (Cartera.tsx y NuevoPago.tsx). Al pagar se guarda `ventas.valor_retencion_fuente`. El trigger descuenta retención del saldo: si `pago + retención >= total` → factura pagada. Migración `11_retenciones_ventas_items.sql`: columna en `ventas_items`, trigger y vistas actualizados.
 16. **Página Retenciones** — `/cartera/retenciones` lista facturas con retención > 0 con total acumulado.
+17. **Observaciones en NuevaVenta** — se agregó columna `observaciones TEXT` en `facturacion.ventas` + textarea en formulario con auto-focus.
+18. **Productos en items de NuevaVenta** — items cambiaron de texto libre a búsqueda de productos por código/nombre con autocomplete; columna "Código" con búsqueda por código exacto al perder foco.
+19. **Default "Ventas sin factura"** — al cargar `/nueva-venta` se preselecciona el tercero "Ventas sin factura" (CC 123456789) y el foco va al campo Observaciones.
+20. **Edición de ventas manuales** — se agregó `GET/PUT /api/ventas/:id` (solo si `cufe IS NULL`), ruta `/nueva-venta/:id`, botón "Editar" en VentasItems para ventas sin factura.
+21. **Numeración consecutiva VEN1...VENn** — migración `13_secuencia_ventas_manual.sql` crea secuencia `facturacion.ventas_manual_seq`; las ventas manuales ahora se numeran `VEN1`, `VEN2`, etc. en lugar de `VENTA-{timestamp}`.
+22. **Observaciones en detalle de factura** — migración `14_vw_facturas_resumen_observaciones.sql` agrega `observaciones` a la vista. Se muestra condicionalmente en `Factura.tsx`.
+23. **Botón Ver en Cartera** — se agregó botón "Ver" en `pages/Cartera.tsx` que abre `/factura/:id` en nueva pestaña.
 
 ## Cálculo de utilidad (`vw_utilidad_productos`)
 - **costo_adquisiciones** = SUM(entradas.cantidad × costo_unitario) — todo lo que entró a inventario (gastos Suministros que generan entrada via trigger)
@@ -98,10 +173,6 @@
 - **otros_costos** = SUM(gastos.valor_total) con producto_id, **excluyendo** clasificacion = 'Suministros' (esos ya están en costo_adquisiciones)
 - **utilidad** = ingreso_ventas - costo_adquisiciones - otros_costos
 - **Importante**: los gastos Suministros crean TANTO un gasto como una entrada de inventario. El gasto Suministros no debe contarse en otros_costos para evitar doble conteo del costo de adquisición.
-
-## Lo que sigue (pendiente)
-1. Backend: probar todos los endpoints nuevos a fondo
-2. Módulo cartera/pagos: añadir dashboard de cartera al endpoint `/api/dashboard` (totales de cartera activa, vencidos)
 
 ## Vinculación gastos operativos a items de venta
 

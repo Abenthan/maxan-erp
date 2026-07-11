@@ -1,11 +1,25 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
 
+interface Product {
+  id: number;
+  codigo: string;
+  nombre: string;
+  categoria: string | null;
+  inventariable: boolean;
+  unidad_medida: string;
+}
+
 interface ItemLinea {
-  descripcion: string;
+  producto_id: number | null;
+  codigoInput: string;
+  searchText: string;
+  codigo: string;
+  nombre: string;
   cantidad: string;
   valor_unitario: string;
+  inventariable: boolean;
 }
 
 interface ClienteResult {
@@ -24,19 +38,78 @@ function formatCurrency(n: number): string {
 export default function NuevaVenta() {
   const navigate = useNavigate();
   const api = useApi();
+  const { id } = useParams();
   const clienteRef = useRef<HTMLDivElement>(null);
+  const obsRef = useRef<HTMLTextAreaElement>(null);
 
-  const [cliente, setCliente] = useState("");
-  const [nit, setNit] = useState("");
+  const [cliente, setCliente] = useState("Ventas sin factura");
+  const [nit, setNit] = useState("123456789");
   const [tipoDoc, setTipoDoc] = useState("13");
   const [dir, setDir] = useState("");
   const [ciudad, setCiudad] = useState("");
   const [sugerencias, setSugerencias] = useState<ClienteResult[]>([]);
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  const [observaciones, setObservaciones] = useState("");
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [productos, setProductos] = useState<Product[]>([]);
+  const [cargandoDatos, setCargandoDatos] = useState(!!id);
+
+  const editandoId = id ? Number(id) : null;
+
+  useEffect(() => {
+    obsRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (editandoId) {
+      Promise.all([
+        api.get<{
+          id: number; fecha_emision: string; observaciones: string; cufe: string | null;
+          razon_social: string; numero_documento: string; tipo_documento: string;
+          direccion: string; ciudad: string;
+          items: { id: number; producto_id: number | null; descripcion: string; codigo_producto: string; cantidad: string; valor_unitario: string; inventariable: boolean; numero_linea: number }[];
+        }>(`/ventas/${editandoId}`),
+        api.get<Product[]>("/productos"),
+      ])
+        .then(([data, prods]) => {
+          setProductos(prods);
+          setCliente(data.razon_social);
+          setNit(data.numero_documento);
+          setTipoDoc(data.tipo_documento || "13");
+          setDir(data.direccion || "");
+          setCiudad(data.ciudad || "");
+          setFecha(data.fecha_emision ? data.fecha_emision.slice(0, 10) : "");
+          setObservaciones(data.observaciones || "");
+          if (data.items && data.items.length > 0) {
+            setLineas(data.items.map((it) => {
+              const p = prods.find((pr) => pr.id === it.producto_id);
+              return {
+                producto_id: it.producto_id,
+                codigoInput: it.codigo_producto || "",
+                searchText: it.producto_id ? `[${it.codigo_producto}] ${it.descripcion}` : "",
+                codigo: it.codigo_producto || "",
+                nombre: it.descripcion,
+                cantidad: it.cantidad,
+                valor_unitario: it.valor_unitario,
+                inventariable: it.inventariable || false,
+              };
+            }));
+          }
+          setCargandoDatos(false);
+        })
+        .catch(() => {
+          setError("Error al cargar la venta");
+          setCargandoDatos(false);
+        });
+    } else {
+      api.get<Product[]>("/productos").then(setProductos).catch(() => {});
+      setCargandoDatos(false);
+    }
+  }, [api, editandoId]);
+
   const [lineas, setLineas] = useState<ItemLinea[]>([
-    { descripcion: "", cantidad: "1", valor_unitario: "" },
+    { producto_id: null, codigoInput: "", searchText: "", codigo: "", nombre: "", cantidad: "1", valor_unitario: "", inventariable: false },
   ]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -73,21 +146,99 @@ export default function NuevaVenta() {
     setMostrarSugerencias(false);
   }
 
-  function actualizarLinea(idx: number, campo: keyof ItemLinea, valor: string) {
+  function seleccionarProducto(idx: number, p: Product) {
     setLineas((prev) => {
       const copia = [...prev];
-      copia[idx] = { ...copia[idx], [campo]: valor };
+      copia[idx] = {
+        producto_id: p.id,
+        codigoInput: p.codigo,
+        searchText: `[${p.codigo}] ${p.nombre}`,
+        codigo: p.codigo,
+        nombre: p.nombre,
+        cantidad: copia[idx].cantidad || "1",
+        valor_unitario: copia[idx].valor_unitario,
+        inventariable: p.inventariable,
+      };
+      return copia;
+    });
+  }
+
+  function limpiarProducto(idx: number) {
+    setLineas((prev) => {
+      const copia = [...prev];
+      copia[idx] = {
+        producto_id: null,
+        codigoInput: "",
+        searchText: "",
+        codigo: "",
+        nombre: "",
+        cantidad: "1",
+        valor_unitario: copia[idx].valor_unitario,
+        inventariable: false,
+      };
+      return copia;
+    });
+  }
+
+  function actualizarLinea(idx: number, campo: Exclude<keyof ItemLinea, "producto_id" | "codigo" | "nombre" | "inventariable">, valor: string) {
+    setLineas((prev) => {
+      const copia = [...prev];
+      (copia[idx] as Record<string, string>)[campo] = valor;
       return copia;
     });
   }
 
   function agregarLinea() {
-    setLineas((prev) => [...prev, { descripcion: "", cantidad: "1", valor_unitario: "" }]);
+    setLineas((prev) => [...prev, { producto_id: null, codigoInput: "", searchText: "", codigo: "", nombre: "", cantidad: "1", valor_unitario: "", inventariable: false }]);
   }
 
   function eliminarLinea(idx: number) {
     if (lineas.length <= 1) return;
     setLineas((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function buscarPorCodigo(idx: number) {
+    setLineas((prev) => {
+      const linea = prev[idx];
+      const cod = linea.codigoInput.trim();
+      if (!cod) return prev;
+      const p = productos.find(
+        (prod) => prod.codigo.toLowerCase() === cod.toLowerCase()
+      );
+      const copia = [...prev];
+      if (p) {
+        copia[idx] = {
+          producto_id: p.id,
+          codigoInput: p.codigo,
+          searchText: `[${p.codigo}] ${p.nombre}`,
+          codigo: p.codigo,
+          nombre: p.nombre,
+          cantidad: copia[idx].cantidad || "1",
+          valor_unitario: copia[idx].valor_unitario,
+          inventariable: p.inventariable,
+        };
+      } else if (linea.producto_id) {
+        copia[idx] = {
+          producto_id: null,
+          codigoInput: cod,
+          searchText: "",
+          codigo: "",
+          nombre: "",
+          cantidad: "1",
+          valor_unitario: copia[idx].valor_unitario,
+          inventariable: false,
+        };
+      }
+      return copia;
+    });
+  }
+
+  function productosFiltrados(searchText: string): Product[] {
+    if (!searchText.trim()) return [];
+    const q = searchText.toLowerCase();
+    return productos.filter(
+      (p) => p.codigo.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q)
+    ).slice(0, 10);
   }
 
   const total = lineas.reduce((s, l) => {
@@ -99,12 +250,12 @@ export default function NuevaVenta() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!cliente.trim() || !nit.trim()) return;
-    if (!lineas.some((l) => l.descripcion.trim() && l.valor_unitario)) return;
+    if (!lineas.some((l) => l.producto_id && l.valor_unitario)) return;
 
     setGuardando(true);
     setError("");
     try {
-      await api.post("/ventas", {
+      const body = {
         receptor: {
           tipo_documento: tipoDoc,
           numero_documento: nit.trim(),
@@ -113,20 +264,47 @@ export default function NuevaVenta() {
           ciudad: ciudad.trim() || undefined,
         },
         fecha_emision: fecha,
+        observaciones: observaciones.trim() || undefined,
         items: lineas
-          .filter((l) => l.descripcion.trim() && l.valor_unitario)
+          .filter((l) => l.producto_id && l.valor_unitario)
           .map((l) => {
             const cant = parseFloat(l.cantidad) || 1;
             const vr = parseFloat(l.valor_unitario) || 0;
             return {
-              descripcion: l.descripcion.trim(),
+              producto_id: l.producto_id!,
+              descripcion: l.nombre,
+              codigo_producto: l.codigo,
               cantidad: cant,
               valor_unitario: vr,
               valor_linea: cant * vr,
             };
           }),
-      });
-      setExito("Venta registrada exitosamente");
+      };
+
+      const result = editandoId
+        ? await api.put<{ success: boolean; venta_id: number; total: number; items: { id: number; producto_id: number; cantidad: number }[] }>(`/ventas/${editandoId}`, body)
+        : await api.post<{ success: boolean; venta_id: number; numero: string; total: number; items: { id: number; producto_id: number; cantidad: number }[] }>("/ventas", body);
+
+      if (!editandoId) {
+        const itemsInventariables = (result.items || []).filter(
+          (it) => lineas.find((l) => l.producto_id === it.producto_id)?.inventariable
+        );
+        for (const item of itemsInventariables) {
+          const linea = lineas.find((l) => l.producto_id === item.producto_id);
+          if (!linea) continue;
+          try {
+            await api.post("/inventario/consumir", {
+              factura_item_id: item.id,
+              producto_id: item.producto_id,
+              cantidad: item.cantidad,
+            });
+          } catch {
+            // Si falla el consumo, continuamos (puede no haber stock suficiente)
+          }
+        }
+      }
+
+      setExito(editandoId ? "Venta actualizada exitosamente" : "Venta registrada exitosamente");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error al guardar");
     } finally {
@@ -136,11 +314,15 @@ export default function NuevaVenta() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">Nueva Venta (sin factura)</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-4">{editandoId ? "Editar Venta (sin factura)" : "Nueva Venta (sin factura)"}</h1>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
       )}
+      {cargandoDatos && (
+        <div className="text-center py-12 text-gray-500">Cargando datos de la venta...</div>
+      )}
+
       {exito && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700 flex items-center justify-between">
           <span>{exito}</span>
@@ -153,7 +335,7 @@ export default function NuevaVenta() {
         </div>
       )}
 
-      {!exito && (
+      {!exito && !cargandoDatos && (
         <form onSubmit={handleSubmit}>
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Cliente</h2>
@@ -242,6 +424,17 @@ export default function NuevaVenta() {
                 />
               </div>
             </div>
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Observaciones</label>
+              <textarea
+                ref={obsRef}
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                placeholder="Nombre del cliente u otros datos"
+                rows={2}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
@@ -260,7 +453,8 @@ export default function NuevaVenta() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b text-left">
-                    <th className="p-2 font-semibold text-gray-600 w-2/5">Descripción</th>
+                    <th className="p-2 font-semibold text-gray-600 w-24">Código</th>
+                    <th className="p-2 font-semibold text-gray-600 w-2/5">Producto</th>
                     <th className="p-2 font-semibold text-gray-600 text-right w-16">Cant</th>
                     <th className="p-2 font-semibold text-gray-600 text-right w-28">Vr Unitario</th>
                     <th className="p-2 font-semibold text-gray-600 text-right w-28">Total</th>
@@ -271,17 +465,77 @@ export default function NuevaVenta() {
                   {lineas.map((l, idx) => {
                     const cant = parseFloat(l.cantidad) || 0;
                     const vr = parseFloat(l.valor_unitario) || 0;
+                    const resultados = productosFiltrados(l.searchText);
                     return (
                       <tr key={idx} className="border-b">
                         <td className="p-1">
                           <input
                             type="text"
-                            value={l.descripcion}
-                            onChange={(e) => actualizarLinea(idx, "descripcion", e.target.value)}
-                            placeholder="Descripción del item"
-                            required
+                            value={l.codigoInput}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setLineas((prev) => {
+                                const copia = [...prev];
+                                copia[idx] = { ...copia[idx], codigoInput: val };
+                                return copia;
+                              });
+                            }}
+                            onBlur={() => buscarPorCodigo(idx)}
+                            placeholder="Código"
+                            autoComplete="off"
                             className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
+                        </td>
+                        <td className="p-1 relative">
+                          {l.producto_id ? (
+                            <div className="flex items-center gap-1">
+                              <span className="flex-1 px-2 py-1.5 text-sm bg-gray-50 rounded border border-gray-200 truncate">
+                                {l.nombre}
+                                {l.inventariable && <span className="ml-2 text-xs text-emerald-600">· Inventariable</span>}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => limpiarProducto(idx)}
+                                className="text-gray-400 hover:text-red-500 text-lg leading-none px-1"
+                                title="Cambiar producto"
+                              >
+                                ↺
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <input
+                                type="text"
+                                value={l.searchText}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setLineas((prev) => {
+                                    const copia = [...prev];
+                                    copia[idx] = { ...copia[idx], searchText: val };
+                                    return copia;
+                                  });
+                                }}
+                                placeholder="Buscar producto..."
+                                autoComplete="off"
+                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              {resultados.length > 0 && (
+                                <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                  {resultados.map((p) => (
+                                    <button
+                                      key={p.id}
+                                      type="button"
+                                      onClick={() => seleccionarProducto(idx, p)}
+                                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-0"
+                                    >
+                                      <span className="font-medium">[{p.codigo}]</span> {p.nombre}
+                                      {p.inventariable && <span className="ml-2 text-xs text-emerald-600">· Inv</span>}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
                         </td>
                         <td className="p-1">
                           <input
@@ -350,7 +604,7 @@ export default function NuevaVenta() {
               disabled={guardando || !cliente.trim() || !nit.trim() || total <= 0}
               className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
             >
-              {guardando ? "Guardando..." : "Guardar Venta"}
+              {guardando ? (editandoId ? "Actualizando..." : "Guardando...") : (editandoId ? "Actualizar Venta" : "Guardar Venta")}
             </button>
           </div>
         </form>

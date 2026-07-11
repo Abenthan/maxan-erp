@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
+import { usePermiso } from "../context/AuthContext";
 
 interface Producto {
   id: number;
@@ -19,6 +20,7 @@ interface Categoria {
 export default function Productos() {
   const api = useApi();
   const navigate = useNavigate();
+  const puedeGestionar = usePermiso("productos.gestionar");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,8 +208,8 @@ export default function Productos() {
               filtrados.map((p) => (
                 <tr
                   key={p.id}
-                  onClick={() => seleccionar(p)}
-                  className={`border-b hover:bg-gray-50 cursor-pointer ${editId === p.id ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : ""}`}
+                  onClick={() => puedeGestionar && seleccionar(p)}
+                  className={`border-b hover:bg-gray-50 ${puedeGestionar ? "cursor-pointer" : ""} ${editId === p.id ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : ""}`}
                 >
                   <td className="p-3 font-medium text-gray-800">{p.codigo}</td>
                   <td className="p-3 font-medium">{p.nombre}</td>
@@ -243,7 +245,7 @@ export default function Productos() {
         </table>
       </div>
 
-      {!editId && (
+      {puedeGestionar && !editId && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Nuevo Producto</h2>
           <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
@@ -333,7 +335,7 @@ export default function Productos() {
         </div>
       )}
 
-      {editId && editModalOpen && (
+      {puedeGestionar && editId && editModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => limpiarForm()}>
           <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Editar Producto</h2>

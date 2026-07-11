@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useApi } from "../context/ApiContext";
+import { usePermiso } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 interface CarteraItem {
@@ -51,6 +52,7 @@ const diasColor = (dias: number): string => {
 export default function Cartera() {
   const api = useApi();
   const navigate = useNavigate();
+  const puedeGestionar = usePermiso("cartera.gestionar");
 
   const [items, setItems] = useState<CarteraItem[]>([]);
   const [mediosPago, setMediosPago] = useState<MedioPago[]>([]);
@@ -214,12 +216,14 @@ export default function Cartera() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Cartera</h1>
-        <button
-          onClick={() => navigate("/cartera/nuevo-pago")}
-          className="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700"
-        >
-          + Nuevo Pago
-        </button>
+        {puedeGestionar && (
+          <button
+            onClick={() => navigate("/cartera/nuevo-pago")}
+            className="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700"
+          >
+            + Nuevo Pago
+          </button>
+        )}
       </div>
 
       {error && (
@@ -304,14 +308,22 @@ export default function Cartera() {
                       </span>
                     </td>
                     <td className="p-3">
-                      {Number(it.saldo_pendiente) > 0 && (
+                      <div className="flex gap-1">
                         <button
-                          onClick={() => abrirModal(it.cliente_id, it.cliente)}
-                          className="px-3 py-1 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700"
+                          onClick={() => window.open(`/factura/${it.venta_id}`, "_blank")}
+                          className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-lg hover:bg-blue-200"
                         >
-                          Pagar
+                          Ver
                         </button>
-                      )}
+                        {Number(it.saldo_pendiente) > 0 && puedeGestionar && (
+                          <button
+                            onClick={() => abrirModal(it.cliente_id, it.cliente)}
+                            className="px-3 py-1 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700"
+                          >
+                            Pagar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

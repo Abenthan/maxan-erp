@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
+import { usePermiso } from "../context/AuthContext";
 
 interface Product {
   id: number;
@@ -24,6 +25,7 @@ interface VentaItem {
   nit_cliente: string;
   producto_id: number | null;
   consumido: boolean;
+  cufe: string | null;
 }
 
 type SortKey = "fecha_emision" | "numero_completo" | "cliente";
@@ -36,6 +38,8 @@ function formatCurrency(n: number): string {
 export default function VentasItems() {
   const api = useApi();
   const navigate = useNavigate();
+  const puedeCrearVenta = usePermiso("ventas.crear");
+  const puedeGestionarInventario = usePermiso("inventario.gestionar");
   const [items, setItems] = useState<VentaItem[]>([]);
   const [productos, setProductos] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -248,17 +252,19 @@ export default function VentasItems() {
                       <td className="p-3 text-right font-medium">{formatCurrency(Number(it.valor_linea))}</td>
                       <td className="p-3">
                         <div className="flex flex-wrap gap-1.5">
-                          <button
-                            onClick={() => abrirModalProducto(it)}
-                            className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
-                              it.producto_id
-                                ? "bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
-                                : "bg-white border-gray-300 text-gray-600 hover:bg-gray-100"
-                            }`}
-                            title={it.producto_id ? `Producto: ${prod?.nombre || ""}` : "Asignar producto"}
-                          >
-                            Producto
-                          </button>
+                          {puedeGestionarInventario && (
+                            <button
+                              onClick={() => abrirModalProducto(it)}
+                              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                                it.producto_id
+                                  ? "bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
+                                  : "bg-white border-gray-300 text-gray-600 hover:bg-gray-100"
+                              }`}
+                              title={it.producto_id ? `Producto: ${prod?.nombre || ""}` : "Asignar producto"}
+                            >
+                              Producto
+                            </button>
+                          )}
                           <button
                             onClick={() => navigate(`/factura/${it.venta_id}`)}
                             className="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
@@ -271,6 +277,14 @@ export default function VentasItems() {
                           >
                             Gastos
                           </button>
+                          {!it.cufe && puedeCrearVenta && (
+                            <button
+                              onClick={() => navigate(`/nueva-venta/${it.venta_id}`)}
+                              className="px-2.5 py-1 text-xs font-medium rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                            >
+                              Editar
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

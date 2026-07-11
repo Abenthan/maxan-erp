@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useApi } from "../context/ApiContext";
+import { usePermiso } from "../context/AuthContext";
 
 interface Pago {
   id: number;
@@ -48,6 +49,7 @@ const mediosPermitidos = ["Efectivo", "Transferencia Bancaria"];
 
 export default function Pagos() {
   const api = useApi();
+  const puedeGestionar = usePermiso("cartera.gestionar");
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [mediosPago, setMediosPago] = useState<MedioPago[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,8 +220,8 @@ export default function Pagos() {
                 pagos.map((p) => (
                   <tr
                     key={p.id}
-                    onClick={() => !p.anulado && abrirModal(p.id)}
-                    className={`border-b hover:bg-gray-50 ${!p.anulado ? "cursor-pointer" : ""} ${p.anulado ? "opacity-50" : ""}`}
+                    onClick={() => !p.anulado && puedeGestionar && abrirModal(p.id)}
+                    className={`border-b hover:bg-gray-50 ${!p.anulado && puedeGestionar ? "cursor-pointer" : ""} ${p.anulado ? "opacity-50" : ""}`}
                   >
                     <td className="p-3">{formatDate(p.fecha_pago)}</td>
                     <td className="p-3">
@@ -327,13 +329,15 @@ export default function Pagos() {
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => anularPago(detalle.id)}
-                  className="px-4 py-2 text-sm rounded-lg border border-red-300 text-red-700 hover:bg-red-50 mr-auto"
-                >
-                  Anular Pago
-                </button>
+                {puedeGestionar && (
+                  <button
+                    type="button"
+                    onClick={() => anularPago(detalle.id)}
+                    className="px-4 py-2 text-sm rounded-lg border border-red-300 text-red-700 hover:bg-red-50 mr-auto"
+                  >
+                    Anular Pago
+                  </button>
+                )}
                 {!detalle.anulado && (
                   <button
                     type="submit"

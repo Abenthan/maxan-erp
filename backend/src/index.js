@@ -1,6 +1,14 @@
 require('dotenv').config();
 const express = require("express");
+const cors = require("cors");
 const { Pool } = require("pg");
+const { authenticate } = require("./middleware/auth");
+const { seedPermisos } = require("./seed/permisos");
+
+const authRouter = require("./routes/auth");
+const usuariosRouter = require("./routes/usuarios");
+const rolesRouter = require("./routes/roles");
+const permisosRouter = require("./routes/permisos");
 const facturasRouter = require("./routes/facturas");
 const productosRouter = require("./routes/productos");
 const gastosRouter = require("./routes/gastos");
@@ -27,21 +35,32 @@ const pool = new Pool({
 
 app.locals.pool = pool;
 
+app.use(cors());
 app.use(express.text({ type: ["text/xml", "application/xml", "text/plain"] }));
 app.use(express.json({ type: "application/json" }));
 
-app.use("/api/facturas", facturasRouter);
-app.use("/api/productos/categorias", categoriasRouter);
-app.use("/api/productos", productosRouter);
-app.use("/api/gastos/clasificaciones", clasificacionesGastoRouter);
-app.use("/api/gastos", gastosRouter);
-app.use("/api/compras", comprasRouter);
-app.use("/api/inventario", inventarioRouter);
-app.use("/api/facturacion", facturacionRouter);
-app.use("/api/ventas", ventasRouter);
-app.use("/api/dashboard", dashboardRouter);
-app.use("/api/cartera", carteraRouter);
-app.use("/api/terceros", tercerosRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/usuarios", usuariosRouter);
+app.use("/api/roles", rolesRouter);
+app.use("/api/permisos", permisosRouter);
+
+const apiRouter = express.Router();
+apiRouter.use(authenticate);
+
+apiRouter.use("/facturas", facturasRouter);
+apiRouter.use("/productos/categorias", categoriasRouter);
+apiRouter.use("/productos", productosRouter);
+apiRouter.use("/gastos/clasificaciones", clasificacionesGastoRouter);
+apiRouter.use("/gastos", gastosRouter);
+apiRouter.use("/compras", comprasRouter);
+apiRouter.use("/inventario", inventarioRouter);
+apiRouter.use("/facturacion", facturacionRouter);
+apiRouter.use("/ventas", ventasRouter);
+apiRouter.use("/dashboard", dashboardRouter);
+apiRouter.use("/cartera", carteraRouter);
+apiRouter.use("/terceros", tercerosRouter);
+
+app.use("/api", apiRouter);
 
 app.get("/health", async (req, res) => {
   try {
@@ -58,6 +77,19 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || "Error interno del servidor" });
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor backend escuchando en el puerto ${PORT}`);
-});
+async function start() {
+  try {
+    await seedPermisos(pool);
+    console.log("Permisos y roles inicializados correctamente");
+  } catch (error) {
+    if (error.code !== "42P01") {
+      console.warn("No se pudieron inicializar permisos (puede que la migración SQL no esté aplicada):", error.message);
+    }
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Servidor backend escuchando en el puerto ${PORT}`);
+  });
+}
+
+start();

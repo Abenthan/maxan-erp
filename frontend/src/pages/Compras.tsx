@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
+import { usePermiso } from "../context/AuthContext";
 
 interface FacturaCompra {
   id: number;
@@ -28,6 +29,7 @@ const estadoBadge: Record<string, string> = {
 export default function Compras() {
   const api = useApi();
   const navigate = useNavigate();
+  const puedeCrear = usePermiso("compras.crear");
   const [compras, setCompras] = useState<FacturaCompra[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -102,12 +104,14 @@ export default function Compras() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Compras</h1>
-        <Link
-          to="/nueva-compra"
-          className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
-        >
-          + Subir XML
-        </Link>
+        {puedeCrear && (
+          <Link
+            to="/nueva-compra"
+            className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
+          >
+            + Subir XML
+          </Link>
+        )}
       </div>
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <div className="flex flex-wrap items-end gap-3">

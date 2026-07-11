@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
+import { usePermiso } from "../context/AuthContext";
 
 interface Producto {
   id: number;
@@ -60,6 +61,7 @@ const clasifBadge: Record<string, string> = {
 
 export default function Gestos() {
   const api = useApi();
+  const puedeGestionar = usePermiso("gastos.gestionar");
   const [searchParams, setSearchParams] = useSearchParams();
   const filtroProductoId = searchParams.get("producto_id") || "";
   const filtroProductoNombre = searchParams.get("nombre") || "";
@@ -392,8 +394,8 @@ export default function Gestos() {
                 filtrados.map((g) => (
                     <tr
                       key={g.id}
-                      onClick={() => seleccionar(g)}
-                      className={`border-b hover:bg-gray-50 cursor-pointer ${editId === g.id ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : ""}`}
+                      onClick={() => puedeGestionar && seleccionar(g)}
+                      className={`border-b hover:bg-gray-50 ${puedeGestionar ? "cursor-pointer" : ""} ${editId === g.id ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : ""}`}
                     >
                       <td className="p-3 text-gray-600">{new Date(g.fecha).toLocaleDateString("es-CO")}</td>
                       <td className="p-3 font-medium">{g.descripcion}</td>
@@ -417,7 +419,7 @@ export default function Gestos() {
         </div>
       </div>
 
-      {!editId && (
+      {puedeGestionar && !editId && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Nuevo Gasto</h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
@@ -578,7 +580,7 @@ export default function Gestos() {
         </div>
       )}
 
-      {editId && editModalOpen && (
+      {puedeGestionar && editId && editModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => limpiarForm()}>
           <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Editar Gasto</h2>
@@ -759,7 +761,7 @@ export default function Gestos() {
         </div>
       )}
 
-      {showModal && (
+      {puedeGestionar && showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Nuevo Producto Rápido</h3>
@@ -847,7 +849,7 @@ export default function Gestos() {
         </div>
       )}
 
-      {showClasifModal && (
+      {puedeGestionar && showClasifModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowClasifModal(false)}>
           <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Administrar Clasificaciones de Gastos</h3>
