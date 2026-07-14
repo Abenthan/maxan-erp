@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useApi } from "../../context/ApiContext";
 import { usePermiso } from "../../context/AuthContext";
 import { useHelpdesk } from "../../context/HelpdeskContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 interface Recurso {
   id: number;
@@ -22,41 +22,41 @@ interface Recurso {
   activo: boolean;
 }
 
-interface Tercero {
-  id: number;
-  razon_social: string;
-}
-
 export default function Recursos() {
   const api = useApi();
+  const navigate = useNavigate();
   const { cliente } = useHelpdesk();
   const puedeGestionar = usePermiso("helpdesk.gestionar");
   const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [filtro, setFiltro] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState("");
+
 
   const cargar = useCallback(async () => {
     const params = new URLSearchParams();
     if (filtro) params.set("q", filtro);
-    if (filtroTipo) params.set("tipo", filtroTipo);
     if (cliente) params.set("cliente_id", String(cliente.id));
     const data = await api.get<Recurso[]>(`/helpdesk/recursos?${params}`);
     setRecursos(data);
-  }, [api, filtro, filtroTipo, cliente]);
+  }, [api, filtro, cliente]);
 
   useEffect(() => { cargar(); }, [cargar]);
-
-  const tipos = ["Computador", "Hosting", "Office 365", "Red", "Celular", "Impresora", "Servidor", "UPS", "Cámara"];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Recursos</h1>
-        {puedeGestionar && (
-          <Link to="/helpdesk/obtener-pc" className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700">
-            + Detectar PC
-          </Link>
-        )}
+        <div className="flex gap-2">
+          {puedeGestionar && (
+            <>
+              <button onClick={() => navigate("/helpdesk/nuevo-recurso")} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+                + Nuevo
+              </button>
+              <Link to="/helpdesk/obtener-pc" className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700">
+                + Detectar PC
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-3 flex-wrap">
@@ -67,10 +67,6 @@ export default function Recursos() {
           onChange={(e) => setFiltro(e.target.value)}
         />
         {cliente && <span className="text-sm text-gray-500 self-center">Cliente: <strong>{cliente.razon_social}</strong></span>}
-        <select className="border rounded-lg px-3 py-2 text-sm" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
-          <option value="">Todos los tipos</option>
-          {tipos.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -83,14 +79,16 @@ export default function Recursos() {
               <th className="text-left px-4 py-3 font-medium">Marca</th>
               <th className="text-left px-4 py-3 font-medium">Modelo</th>
               <th className="text-left px-4 py-3 font-medium">Serial</th>
+              <th className="text-left px-4 py-3 font-medium">Estado</th>
+              <th className="text-left px-4 py-3 font-medium">Observaciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {recursos.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-8 text-gray-400">No hay recursos registrados</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-400">No hay recursos registrados</td></tr>
             )}
             {recursos.map((r) => (
-              <tr key={r.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => window.location.href = `/helpdesk/recursos/${r.id}`}>
+              <tr key={r.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/helpdesk/recursos/${r.id}`)}>
                 <td className="px-4 py-3 font-medium text-gray-800">{r.nombre}</td>
                 <td className="px-4 py-3 text-gray-500">{r.cliente_nombre}</td>
                 <td className="px-4 py-3">
@@ -99,11 +97,19 @@ export default function Recursos() {
                 <td className="px-4 py-3 text-gray-500">{r.marca || "-"}</td>
                 <td className="px-4 py-3 text-gray-500">{r.modelo || "-"}</td>
                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">{r.serial || "-"}</td>
+                <td className="px-4 py-3">
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${r.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {r.activo ? "Activo" : "Inactivo"}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-gray-400 text-xs max-w-[200px] truncate">{r.descripcion || "—"}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+
     </div>
   );
 }

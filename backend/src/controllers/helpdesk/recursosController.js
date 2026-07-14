@@ -93,6 +93,9 @@ exports.actualizar = async (req, res) => {
 };
 
 exports.eliminar = async (req, res) => {
+  if (!req.user.permisos.includes("usuarios.gestionar")) {
+    return res.status(403).json({ error: "Solo administradores pueden eliminar recursos" });
+  }
   try {
     const result = await db(req).query("DELETE FROM helpdesk.recursos WHERE id=$1 RETURNING id", [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: "Recurso no encontrado" });

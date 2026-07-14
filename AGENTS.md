@@ -143,7 +143,7 @@
 ## Schemas SQL
 - `db/01_schema.sql` — Schema `facturacion` (aplicado)
 - `db/02_compras_gastos_inventario.sql` — Schemas `compras`, `inventario`, `gastos` con tablas, triggers, vistas (`vw_stock_disponible`, `vw_utilidad_items`, `vw_utilidad_productos`) — **YA aplicado**
-- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`, `10_cufe_nullable.sql`, `11_retenciones_ventas_items.sql`, `12_observaciones_ventas.sql`, `13_secuencia_ventas_manual.sql`, `14_vw_facturas_resumen_observaciones.sql`, `15_modulo_usuarios.sql`, `16_helpdesk_schema.sql`, `17_helpdesk_atributos.sql`, `18_helpdesk_casos.sql`, `19_tipo_tercero.sql`
+- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`, `10_cufe_nullable.sql`, `11_retenciones_ventas_items.sql`, `12_observaciones_ventas.sql`, `13_secuencia_ventas_manual.sql`, `14_vw_facturas_resumen_observaciones.sql`, `15_modulo_usuarios.sql`, `16_helpdesk_schema.sql`, `17_helpdesk_atributos.sql`, `18_helpdesk_casos.sql`, `19_tipo_tercero.sql`, `20_tipos_recurso.sql`
 
 ## Dependencias adicionales
 ### Backend
@@ -292,8 +292,10 @@ docker exec -i maxan_db_dev pg_restore -U maxan_user -d maxan_erp --clean < back
 - **recursos** — Equipos informáticos de clientes (Computador, Hosting, Office 365, Red, etc.)
   - FK: `cliente_id` → `facturacion.terceros(id)`
   - `serial` UNIQUE para detección de duplicados
+  - `tipo` FK → `helpdesk.tipos_recurso(nombre)` (tabla maestra, adminitrable desde `/nuevo-recurso`)
   - Columnas fijas: marca, modelo, serial, procesador, memoria_gb, almacenamiento_gb, sistema_operativo
   - `atributos JSONB` — Campos variables según el tipo (tipo_almacenamiento, chip_video, memoria_video_mb, plan, licencias, fecha_vencimiento, proveedor, dominio, IP, firmware, etc.)
+- **tipos_recurso** — Maestro de tipos (Computador, Hosting, Office 365, Red, Celular, Impresora, Servidor, UPS, Cámara, Otro). CRUD via modal ⚙ en `/nuevo-recurso`.
 - **mantenimientos** — Tickets/casos de soporte vinculados a un recurso
   - Estados: Pendiente → En Progreso → Completado → Facturado / Cancelado
   - Costos: mano_obra + repuestos = costo_total (GENERATED ALWAYS)
@@ -328,14 +330,19 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/api/helpdesk/contactos/:id` | GET/PUT/DELETE | `helpdesk.casos.ver`/`.gestionar` | CRUD contacto individual |
 | `/api/helpdesk/categorias-caso` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | Categorías editables de caso |
 | `/api/helpdesk/categorias-caso/:id` | PUT/DELETE | `helpdesk.casos.gestionar` | Editar/eliminar categoría |
+| `/api/helpdesk/tipos-recurso` | GET | `helpdesk.ver` | Listar tipos de recurso |
+| `/api/helpdesk/tipos-recurso` | POST | `helpdesk.gestionar` | Crear tipo de recurso |
+| `/api/helpdesk/tipos-recurso/:id` | DELETE | `helpdesk.gestionar` | Eliminar tipo de recurso (solo si no está en uso) |
 
 ### Frontend — Páginas
 | Ruta | Componente | Permiso | Descripción |
 |------|-----------|---------|-------------|
 | `/helpdesk` | `Clientes.tsx` | `helpdesk.ver` | Seleccionar cliente para trabajar |
 | `/helpdesk/clientes/:id` | `ClienteDetalle.tsx` | `helpdesk.ver` | Recursos del cliente |
-| `/helpdesk/recursos/:id` | `RecursoDetalle.tsx` | `helpdesk.ver` | Detalle del equipo + historial de mantenimientos. Modo edición con botón "Editar" (requiere `helpdesk.gestionar`), formulario completo con todos los campos fijos y `atributos` (tipo disco, chip video, VRAM). |
-| `/helpdesk/obtener-pc` | `RegistrarPC.tsx` | `helpdesk.gestionar` | Detectar PC: botón copiar script PS + formulario manual |
+| `/helpdesk/recursos` | `Recursos.tsx` | `helpdesk.ver` | Listado de recursos con columnas: Nombre, Cliente, Tipo, Marca, Modelo, Serial, Estado (Activo/Inactivo), Observaciones. Botones + Nuevo y + Detectar PC. |
+| `/helpdesk/recursos/:id` | `RecursoDetalle.tsx` | `helpdesk.ver` | Detalle del equipo + historial de mantenimientos. Modo edición con campos fijos y `atributos` (tipo disco, chip video, VRAM). Botón Eliminar solo para admins (`usuarios.gestionar`). |
+| `/helpdesk/nuevo-recurso` | `NuevoRecurso.tsx` | `helpdesk.gestionar` | Formulario completo para crear cualquier tipo de recurso. Select tipo desde API + ⚙ para administrar tipos. |
+| `/helpdesk/obtener-pc` | `RegistrarPC.tsx` | `helpdesk.gestionar` | Detectar PC: script PS + formulario manual. Cliente desde contexto (no dropdown). |
 | `/helpdesk/casos` | `Casos.tsx` | `helpdesk.casos.ver` | Listado de casos con filtros (búsqueda, estado), tabla con #, título, cliente, categoría, técnico, estado. |
 | `/helpdesk/casos/nuevo` | `CasoNuevo.tsx` | `helpdesk.casos.gestionar` | Formulario crear caso: título, descripción, categoría, técnico, cliente con búsqueda. |
 | `/helpdesk/casos/:id` | `CasoDetalle.tsx` | `helpdesk.casos.ver` | Detalle del caso con bitácora, cambio de estado (Iniciar/Completar/Cancelar), campo de solución al cerrar. |
@@ -350,8 +357,8 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `helpdesk.casos.gestionar` | Helpdesk | Crear/editar/cerrar casos de soporte |
 
 ### Flujo Detectar PC
-1. Técnico abre `/helpdesk/obtener-pc` (o desde un cliente con `?cliente=ID`)
-2. Selecciona el cliente y presiona **"Obtener script"**
+1. Técnico abre `/helpdesk/obtener-pc` (requiere cliente seleccionado en HelpdeskContext, si no hay muestra link para seleccionar)
+2. Presiona **"Obtener script"**
 3. Se genera un `session_code` UUID único via `crypto.randomUUID()`, se pasa como `?session=UUID&cliente_id=X` al backend, y el script PowerShell se copia al portapapeles (o se descarga como `.bat`)
 4. En el PC del cliente: PowerShell como Administrador → pegar → Enter
 5. Script recolecta: nombre PC, serial (BIOS), marca, modelo, procesador, RAM, disco, SO, tipo disco (SSD/HDD), chip de video, VRAM

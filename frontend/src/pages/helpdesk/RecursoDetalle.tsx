@@ -47,12 +47,14 @@ export default function RecursoDetalle() {
   const api = useApi();
   const navigate = useNavigate();
   const puedeGestionar = usePermiso("helpdesk.gestionar");
+  const puedeEliminar = usePermiso("usuarios.gestionar");
 
   const [recurso, setRecurso] = useState<Recurso | null>(null);
   const [mantenimientos, setMantenimientos] = useState<Mantenimiento[]>([]);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [clientes, setClientes] = useState<Tercero[]>([]);
+  const [tipos, setTipos] = useState<{ id: number; nombre: string }[]>([]);
 
   const [form, setForm] = useState({
     cliente_id: 0,
@@ -95,6 +97,7 @@ export default function RecursoDetalle() {
       memoria_video_mb: a.memoria_video_mb?.toString() || "",
     });
     api.get<Tercero[]>("/terceros?tipo=cliente").then(setClientes).catch(() => {});
+    api.get<{ id: number; nombre: string }[]>("/helpdesk/tipos-recurso").then(setTipos).catch(() => {});
     setEditando(true);
   }
 
@@ -168,7 +171,9 @@ export default function RecursoDetalle() {
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Tipo</label>
-              <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.tipo} onChange={(e) => setForm({...form, tipo: e.target.value})} />
+              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.tipo} onChange={(e) => setForm({...form, tipo: e.target.value})}>
+                {tipos.map((t) => <option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Serial *</label>
@@ -226,8 +231,8 @@ export default function RecursoDetalle() {
               </label>
             </div>
             <div className="col-span-2">
-              <label className="block text-xs text-gray-500 mb-1">Descripción</label>
-              <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={3} value={form.descripcion} onChange={(e) => setForm({...form, descripcion: e.target.value})} />
+              <label className="block text-xs text-gray-500 mb-1">Observaciones</label>
+              <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={3} value={form.descripcion} onChange={(e) => setForm({...form, descripcion: e.target.value})} placeholder="Notas adicionales sobre el recurso..." />
             </div>
           </div>
 
@@ -250,15 +255,27 @@ export default function RecursoDetalle() {
           <Link to="/helpdesk/recursos" className="text-sm text-gray-400 hover:text-gray-600">← Recursos</Link>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{recurso.nombre}</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${recurso.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            {recurso.activo ? 'Activo' : 'Inactivo'}
+          </span>
           {puedeGestionar && (
             <button onClick={iniciarEdicion} className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700">
               Editar
             </button>
           )}
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${recurso.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {recurso.activo ? 'Activo' : 'Inactivo'}
-          </span>
+          {puedeEliminar && (
+            <button
+              onClick={() => {
+                if (window.confirm("¿Estás seguro de eliminar este recurso?\nEsta acción no se puede deshacer.")) {
+                  api.del(`/helpdesk/recursos/${id}`).then(() => navigate("/helpdesk/recursos")).catch(() => alert("Error al eliminar"));
+                }
+              }}
+              className="border border-red-300 text-red-700 px-4 py-2 rounded-lg text-sm hover:bg-red-50"
+            >
+              Eliminar
+            </button>
+          )}
         </div>
       </div>
 

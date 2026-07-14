@@ -38,6 +38,7 @@ import RegistrarPC from "./pages/helpdesk/RegistrarPC";
 import Casos from "./pages/helpdesk/Casos";
 import CasoDetalle from "./pages/helpdesk/CasoDetalle";
 import CasoNuevo from "./pages/helpdesk/CasoNuevo";
+import NuevoRecurso from "./pages/helpdesk/NuevoRecurso";
 import Mantenimientos from "./pages/helpdesk/Mantenimientos";
 import MantenimientoNuevo from "./pages/helpdesk/MantenimientoNuevo";
 import MantenimientoDetalle from "./pages/helpdesk/MantenimientoDetalle";
@@ -128,6 +129,7 @@ function HelpdeskRoutes() {
           <Route path="recursos" element={<ProtectedRoute permiso="helpdesk.ver"><Recursos /></ProtectedRoute>} />
           <Route path="recursos/:id" element={<ProtectedRoute permiso="helpdesk.ver"><RecursoDetalle /></ProtectedRoute>} />
           <Route path="obtener-pc" element={<ProtectedRoute permiso="helpdesk.gestionar"><RegistrarPC /></ProtectedRoute>} />
+          <Route path="nuevo-recurso" element={<ProtectedRoute permiso="helpdesk.gestionar"><NuevoRecurso /></ProtectedRoute>} />
           <Route path="casos" element={<ProtectedRoute permiso="helpdesk.casos.ver"><Casos /></ProtectedRoute>} />
           <Route path="casos/nuevo" element={<ProtectedRoute permiso="helpdesk.casos.gestionar"><CasoNuevo /></ProtectedRoute>} />
           <Route path="casos/:id" element={<ProtectedRoute permiso="helpdesk.casos.ver"><CasoDetalle /></ProtectedRoute>} />

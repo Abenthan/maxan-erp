@@ -29,6 +29,7 @@ const helpdeskCategoriasRouter = require("./routes/helpdesk/categorias");
 const helpdeskCasosRouter = require("./routes/helpdesk/casos");
 const helpdeskContactosRouter = require("./routes/helpdesk/contactos");
 const helpdeskCategoriasCasoRouter = require("./routes/helpdesk/categoriasCaso");
+const helpdeskTiposRecursoRouter = require("./routes/helpdesk/tiposRecurso");
 const backupRouter = require("./routes/backup");
 
 const app = express();
@@ -78,6 +79,7 @@ apiRouter.use("/helpdesk/categorias-mantenimiento", helpdeskCategoriasRouter);
 apiRouter.use("/helpdesk/casos", helpdeskCasosRouter);
 apiRouter.use("/helpdesk/contactos", helpdeskContactosRouter);
 apiRouter.use("/helpdesk/categorias-caso", helpdeskCategoriasCasoRouter);
+apiRouter.use("/helpdesk/tipos-recurso", helpdeskTiposRecursoRouter);
 
 app.use("/api", apiRouter);
 

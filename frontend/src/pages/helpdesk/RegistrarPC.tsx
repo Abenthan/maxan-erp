@@ -1,18 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useApi } from "../../context/ApiContext";
-import { useNavigate, useSearchParams } from "react-router-dom";
-
-interface Tercero {
-  id: number;
-  razon_social: string;
-}
+import { useNavigate } from "react-router-dom";
+import { useHelpdesk } from "../../context/HelpdeskContext";
 
 export default function RegistrarPC() {
   const api = useApi();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { cliente } = useHelpdesk();
 
-  const [clientes, setClientes] = useState<Tercero[]>([]);
   const [paso, setPaso] = useState<"inicial" | "script" | "revision" | "manual">("inicial");
   const [datosPC, setDatosPC] = useState<any>(null);
   const [guardando, setGuardando] = useState(false);
@@ -20,8 +15,7 @@ export default function RegistrarPC() {
 
   const [sessionCode, setSessionCode] = useState("");
   const [scriptTexto, setScriptTexto] = useState("");
-  const [nombre, setNombre] = useState(searchParams.get("nombre") || "");
-  const [clienteId, setClienteId] = useState(searchParams.get("cliente") || "");
+  const [nombre, setNombre] = useState("");
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
   const [serial, setSerial] = useState("");
@@ -33,16 +27,12 @@ export default function RegistrarPC() {
   const [chipVideo, setChipVideo] = useState("");
   const [memoriaVideoMb, setMemoriaVideoMb] = useState("");
 
-  useEffect(() => {
-    api.get<Tercero[]>("/terceros?tipo=cliente").then(setClientes).catch(() => {});
-  }, [api]);
-
   async function obtenerScript() {
-    if (!clienteId) return alert("Selecciona un cliente primero");
+    if (!cliente) return alert("Selecciona un cliente primero");
     const session = crypto.randomUUID();
     setSessionCode(session);
     try {
-      const qs = `?cliente_id=${clienteId}&session=${session}`;
+      const qs = `?cliente_id=${cliente.id}&session=${session}`;
       const script = await api.get<string>(`/helpdesk/recursos/script${qs}`);
       setScriptTexto(script);
       await navigator.clipboard.writeText(script);
@@ -78,10 +68,11 @@ export default function RegistrarPC() {
 
   async function guardar() {
     if (!serial) return alert("El serial es obligatorio");
+    if (!cliente) return alert("Selecciona un cliente primero");
     setGuardando(true);
     try {
       const res = await api.post("/helpdesk/recursos", {
-        cliente_id: Number(clienteId),
+        cliente_id: cliente.id,
         nombre: nombre || serial,
         tipo: "Computador",
         marca,
@@ -111,10 +102,11 @@ export default function RegistrarPC() {
 
   async function guardarDetectado() {
     if (!datosPC) return;
+    if (!cliente) return alert("Selecciona un cliente primero");
     setGuardando(true);
     try {
       const res = await api.post("/helpdesk/recursos", {
-        cliente_id: Number(clienteId),
+        cliente_id: cliente.id,
         nombre: datosPC.nombre || datosPC.serial,
         tipo: "Computador",
         marca: datosPC.marca,
@@ -144,19 +136,24 @@ export default function RegistrarPC() {
 
       {paso === "inicial" && (
         <div className="space-y-4">
-          <div className="bg-white border rounded-xl p-4">
-            <label className="block text-xs text-gray-500 mb-1">Cliente *</label>
-            <select className="w-full border rounded-lg px-3 py-2 text-sm" value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
-              <option value="">Seleccionar cliente...</option>
-              {clientes.map((c) => <option key={c.id} value={c.id}>{c.razon_social}</option>)}
-            </select>
-          </div>
+          {cliente && (
+            <div className="bg-white border rounded-xl p-4 flex items-center gap-2">
+              <span className="text-xs text-gray-500">Cliente:</span>
+              <span className="text-sm font-semibold text-gray-800">{cliente.razon_social}</span>
+            </div>
+          )}
+          {!cliente && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+              No hay un cliente seleccionado.{' '}
+              <button onClick={() => navigate("/helpdesk")} className="underline font-medium">Seleccionar cliente</button>
+            </div>
+          )}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 space-y-4">
             <h2 className="font-semibold text-amber-800">Opción 1: Detección automática</h2>
             <p className="text-sm text-amber-700">
               Ejecuta un script en el PC del cliente para obtener los datos automáticamente.
             </p>
-            <button onClick={obtenerScript} disabled={!clienteId} className="bg-amber-600 text-white px-6 py-2.5 rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50">
+            <button onClick={obtenerScript} disabled={!cliente} className="bg-amber-600 text-white px-6 py-2.5 rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50">
               Obtener script
             </button>
           </div>
@@ -186,7 +183,7 @@ export default function RegistrarPC() {
               {buscando ? "Buscando..." : "Ya ejecuté el script"}
             </button>
             <button onClick={obtenerScript} className="text-sm text-green-700 underline">Copiar de nuevo</button>
-            <button onClick={async () => { try { const qs = `?format=bat&cliente_id=${clienteId}&session=${sessionCode}`; const batScript = await api.get<string>(`/helpdesk/recursos/script${qs}`); const u = URL.createObjectURL(new Blob([batScript], { type: "text/plain;charset=utf-8" })); const a = document.createElement("a"); a.href = u; a.download = "detectar-pc.bat"; a.click(); URL.revokeObjectURL(u); } catch { alert("Error al descargar el script"); } }} className="text-sm text-green-700 underline">Descargar .bat</button>
+            <button onClick={async () => { try { const qs = `?format=bat&cliente_id=${cliente?.id}&session=${sessionCode}`; const batScript = await api.get<string>(`/helpdesk/recursos/script${qs}`); const u = URL.createObjectURL(new Blob([batScript], { type: "text/plain;charset=utf-8" })); const a = document.createElement("a"); a.href = u; a.download = "detectar-pc.bat"; a.click(); URL.revokeObjectURL(u); } catch { alert("Error al descargar el script"); } }} className="text-sm text-green-700 underline">Descargar .bat</button>
           </div>
           <div className="flex gap-3">
             <button onClick={() => setPaso("manual")} className="text-sm text-gray-500 underline">O ingresar manualmente</button>
@@ -235,13 +232,12 @@ export default function RegistrarPC() {
           <h2 className="font-semibold text-gray-700">Datos del equipo</h2>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-xs text-gray-500 mb-1">Cliente *</label>
-              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
-                <option value="">Seleccionar cliente...</option>
-                {clientes.map((c) => <option key={c.id} value={c.id}>{c.razon_social}</option>)}
-              </select>
-            </div>
+            {cliente && (
+              <div className="col-span-2 flex items-center gap-2 pb-1">
+                <span className="text-xs text-gray-500">Cliente:</span>
+                <span className="text-sm font-semibold text-gray-800">{cliente.razon_social}</span>
+              </div>
+            )}
             <div className="col-span-2">
               <label className="block text-xs text-gray-500 mb-1">Nombre del equipo *</label>
               <input className="w-full border rounded-lg px-3 py-2 text-sm" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Lenovo Andres Cortez" />
@@ -294,7 +290,7 @@ export default function RegistrarPC() {
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button onClick={guardar} disabled={guardando || !clienteId || !serial}
+            <button onClick={guardar} disabled={guardando || !cliente || !serial}
               className="bg-amber-600 text-white px-6 py-2.5 rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50">
               {guardando ? "Guardando..." : "Guardar"}
             </button>
