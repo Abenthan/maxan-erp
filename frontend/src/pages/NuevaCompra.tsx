@@ -315,7 +315,7 @@ export default function NuevaCompra() {
 
               <div className="flex gap-3 justify-end">
                 <button
-                  onClick={() => navigate("/compras")}
+                  onClick={() => navigate("/financiero/compras")}
                   className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   Volver
@@ -334,7 +334,7 @@ export default function NuevaCompra() {
           {guardado && (
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => navigate("/compras")}
+                onClick={() => navigate("/financiero/compras")}
                 className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
               >
                 Ir a Compras

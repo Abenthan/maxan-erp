@@ -106,7 +106,7 @@ export default function Compras() {
         <h1 className="text-2xl font-bold text-gray-900">Compras</h1>
         {puedeCrear && (
           <Link
-            to="/nueva-compra"
+            to="/financiero/nueva-compra"
             className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
           >
             + Subir XML
@@ -166,7 +166,7 @@ export default function Compras() {
           </thead>
           <tbody>
             {sorted.map((c) => (
-              <tr key={c.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/compra/${c.id}`)}>
+              <tr key={c.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/financiero/compra/${c.id}`)}>
                 <td className="p-3 font-medium">{c.numero_completo}</td>
                 <td className="p-3 text-gray-600">{new Date(c.fecha_emision).toLocaleDateString("es-CO")}</td>
                 <td className="p-3">

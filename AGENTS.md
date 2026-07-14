@@ -7,7 +7,16 @@
 - UI: Sidebar lateral con grupos (VENTAS azul, COSTOS naranja, CARTERA púrpura, INVENTARIO verde) + header, Tailwind puro
 - BD vacía (todos los registros borrados)
 
-## Sidebar (Layout.tsx)
+## Arquitectura de módulos
+- `/` — Landing page con 4 módulos (Financiero, Helpdesk, Configuración, CRM)
+- `/financiero/*` — Layout sidebar (VENTAS azul, COSTOS naranja, CARTERA púrpura, INVENTARIO verde)
+- `/helpdesk/*` — Layout simple (header + contenido)
+- `/configuracion/*` — Usuarios, roles y copia de seguridad
+- `/crm` — Placeholder
+- `/terceros` — Standalone, sin sidebar (usa HelpdeskLayout con header "Maxan ERP")
+- `/nuevo-tercero` — Standalone, sin sidebar (usa HelpdeskLayout)
+
+## Sidebar Financiero (Layout.tsx)
 ```
 📊 Dashboard
 ── VENTAS ──        (bg-blue-50)
@@ -35,7 +44,7 @@
 - Schema: `facturacion` en PostgreSQL
 
 ## Nuevos módulos backend
-- **Clientes** — `routes/terceros.js` → `GET /api/terceros` (con filtro `?q=` y `?tipo_documento=`), `GET /api/terceros/:id`, `POST /api/terceros` (crear/upsert), `PUT /api/terceros/:id`, `DELETE /api/terceros/:id`
+- **Clientes** — `routes/terceros.js` → `GET /api/terceros` (con filtro `?q=`, `?tipo=cliente|proveedor`, `?tipo_documento=`), `GET /api/terceros/:id`, `POST /api/terceros` (crear/upsert con `es_cliente`/`es_proveedor`), `PUT /api/terceros/:id`, `DELETE /api/terceros/:id` (protegido con `authorize("terceros.gestionar")` + verifica `usuarios.gestionar` en controller — solo admins)
 - **Productos** — `routes/productos.js` → `POST/GET/PUT /api/productos`, `GET/POST/DELETE /api/productos/categorias`
 - **Gastos** — `routes/gastos.js` → `POST/GET /api/gastos`, `PUT /api/gastos/:id`, `PUT /api/gastos/:id/vincular` (vincular/desvincular a venta_item_id), filtros `?producto_id=`, `?venta_item_id=`, `?sin_vinculo=true`
 - **Clasificaciones de Gasto** — `routes/clasificacionesGasto.js` → `GET/POST/DELETE /api/gastos/clasificaciones` (maestro como categorías de producto, con FK en `gastos.gastos.clasificacion`)
@@ -48,6 +57,7 @@
 - **Dashboard** — `routes/dashboard.js` → `GET /api/dashboard` con filtros `?mes=&cliente_id=&factura_id=`
   - Retorna: resumen, ventas_por_mes, gastos_por_mes, gastos_por_clasificacion, top_clientes, ultimas_facturas, clientes, productos_utilidad
 - **Cartera/Pagos** — `routes/cartera.js` → `GET /api/cartera/activa` (aging A/R), `POST/GET /api/cartera/pagos` (crear/listar), `GET /api/cartera/pagos/:id` (detalle), `PUT /api/cartera/pagos/:id` (editar fecha/medio/referencia/observaciones), `POST /api/cartera/pagos/:id/anular`, `GET /api/cartera/clientes-deuda` (clientes con saldo), `GET /api/cartera/clientes-deuda/:id/facturas` (facturas pendientes), `GET/POST /api/cartera/medios-pago`, `GET /api/cartera/retenciones` (listado de retenciones realizadas)
+- **Backup** — `routes/backup.js` → `GET /api/backup/descargar` (stream pg_dump -Fc via Docker), `GET /api/backup/verificar` (comprueba disponibilidad). Protegido con `usuarios.gestionar`.
 
 ## Frontend módulos (implementados)
 - `pages/Dashboard.tsx` — Página principal `/` con cards de resumen, barras ventas/gastos/clasificación, top clientes, últimas facturas, utilidad por producto. Filtros: mes (select últimos 12 meses), cliente, factura ID.
@@ -58,8 +68,8 @@
 - `pages/Inventario.tsx` — Stock desde `vw_stock_disponible`
 - `pages/VentasItems.tsx` — Items de venta con filtros, modal asignar producto con consumo FIFO, botones Ver, Gastos y Editar (solo para ventas sin factura, identificadas por `cufe IS NULL`)
 - `pages/Utilidad.tsx` — Dos tabs: Por Producto (tabla desde vw_utilidad_productos) y Por Factura (input ID + resumen + detalle líneas)
-- `pages/Terceros.tsx` — `/terceros` CRUD completo con tabla, filtro búsqueda, fila clickeable → modal edición, eliminar
-- `pages/NuevoTercero.tsx` — `/nuevo-tercero` Formulario para crear nuevo tercero
+- `pages/Terceros.tsx` — `/terceros` CRUD completo con tabla (avatares por iniciales, badges Cliente/Proveedor), filtros búsqueda + tipo, fila clickeable → modal edición, botón Eliminar solo para admins (`usuarios.gestionar`)
+- `pages/NuevoTercero.tsx` — `/nuevo-tercero` Formulario para crear nuevo tercero. Ruta standalone fuera de financiero, accesible con solo `terceros.gestionar`
 - `pages/Cartera.tsx` — `/cartera` Tabla cartera activa con aging (días vencido coloreado, totales), filtro cliente como input texto (búsqueda en tiempo real por nombre/NIT), filtro estado, modal rápido para registrar pago con distribución por factura. Medio de pago limitado a Efectivo/Transferencia Bancaria, default Transferencia.
 - `pages/Pagos.tsx` — `/cartera/pagos` Historial de pagos recibidos. Click en fila activa → modal de edición (fecha, medio, referencia, observaciones) con PUT. Botón anular preservado.
 - `pages/NuevoPago.tsx` — `/cartera/nuevo-pago` Página dedicada paso a paso (cliente → facturas → confirmar)
@@ -77,7 +87,7 @@
   - `routes/usuarios.js` — CRUD usuarios + asignar roles (solo admin)
   - `routes/roles.js` — CRUD roles + asignar permisos (solo admin)
   - `routes/permisos.js` — CRUD permisos (solo admin)
-- **Seed automático**: al iniciar servidor, crea 19 permisos + 3 roles (Administrador, Operador, Consultor).
+- **Seed automático**: al iniciar servidor, crea 21 permisos + 3 roles (Administrador, Operador, Consultor).
 - **Protección**: todas las rutas `/api/*` (excepto auth/health) requieren `authenticate`. Control granular por permiso en cada endpoint.
 
 ### 19 permisos del sistema
@@ -108,12 +118,15 @@
 - `pages/Register.tsx` — `/register` Registro primer usuario (crea empresa + admin). Solo accesible si no hay usuarios.
 - `pages/Usuarios.tsx` — `/usuarios` CRUD usuarios con asignación de roles. Solo admin.
 - `pages/Roles.tsx` — `/roles` CRUD roles con asignación de permisos por módulo. Solo admin.
+- `pages/Backup.tsx` — `/configuracion/backup` Descargar copia de seguridad de la BD. Botón que genera y descarga archivo .dump via `pg_dump -Fc` dentro del contenedor Docker. Verifica disponibilidad de pg_dump al cargar.
 - `components/ProtectedRoute.tsx` — Wrapper de rutas. Redirige a `/login` si no autenticado. Acepta `permiso` opcional.
 
 ### Frontend — ocultación condicional por permisos
 - Botones "Nuevo", "Editar", "Eliminar" y formularios de creación se ocultan según `usePermiso("codigo")` en cada página.
+- Eliminar terceros requiere `usuarios.gestionar` (admin), no solo `terceros.gestionar`.
 - Sidebar filtra secciones enteras si el usuario no tiene el permiso `*.ver` correspondiente.
 - Header muestra links "Usuarios" y "Roles" solo para admin (`usuarios.gestionar`).
+- "Maxan ERP" en todos los headers es un link a `/` (inicio).
 
 ### Flujo first-run
 1. AuthProvider detecta `isFirstRun` vía `GET /api/auth/check-first-run`
@@ -130,7 +143,7 @@
 ## Schemas SQL
 - `db/01_schema.sql` — Schema `facturacion` (aplicado)
 - `db/02_compras_gastos_inventario.sql` — Schemas `compras`, `inventario`, `gastos` con tablas, triggers, vistas (`vw_stock_disponible`, `vw_utilidad_items`, `vw_utilidad_productos`) — **YA aplicado**
-- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`, `10_cufe_nullable.sql`, `11_retenciones_ventas_items.sql`, `12_observaciones_ventas.sql`, `13_secuencia_ventas_manual.sql`, `14_vw_facturas_resumen_observaciones.sql`, `15_modulo_usuarios.sql`
+- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`, `10_cufe_nullable.sql`, `11_retenciones_ventas_items.sql`, `12_observaciones_ventas.sql`, `13_secuencia_ventas_manual.sql`, `14_vw_facturas_resumen_observaciones.sql`, `15_modulo_usuarios.sql`, `16_helpdesk_schema.sql`, `17_helpdesk_atributos.sql`, `18_helpdesk_casos.sql`, `19_tipo_tercero.sql`
 
 ## Dependencias adicionales
 ### Backend
@@ -166,6 +179,11 @@
 21. **Numeración consecutiva VEN1...VENn** — migración `13_secuencia_ventas_manual.sql` crea secuencia `facturacion.ventas_manual_seq`; las ventas manuales ahora se numeran `VEN1`, `VEN2`, etc. en lugar de `VENTA-{timestamp}`.
 22. **Observaciones en detalle de factura** — migración `14_vw_facturas_resumen_observaciones.sql` agrega `observaciones` a la vista. Se muestra condicionalmente en `Factura.tsx`.
 23. **Botón Ver en Cartera** — se agregó botón "Ver" en `pages/Cartera.tsx` que abre `/factura/:id` en nueva pestaña.
+24. **Script .bat se cerría inmediatamente** → el contenido era PowerShell pero se descargaba como `.bat`, ejecutándose en CMD. Solución: el backend ahora genera un wrapper `.bat` que invoca PowerShell con `-EncodedCommand` (Base64 UTF-16LE) evitando problemas de escaping.
+25. **Endpoint detectar-pc requería token JWT** → el script PowerShell se ejecuta en el PC del cliente sin acceso al token. Solución: mover `POST /detectar-pc` fuera del middleware `authenticate`, montándolo en `app` antes del apiRouter.
+26. **Auto-guardado de PC sin revisión** → el script guardaba automáticamente en BD si recibía `cliente_id`. Se cambió a flujo de dos pasos: los datos se almacenan temporalmente en memoria (`Map` en el controller), el técnico los revisa en pantalla y decide si guardar.
+27. **RecursoDetalle sin edición** → no había forma de editar un recurso helpdesk. Se agregó modo edición inline con formulario completo (campos fijos + `atributos` JSONB: tipo_almacenamiento, chip_video, memoria_video_mb). Guarda vía `PUT /api/helpdesk/recursos/:id`.
+28. **pg_dump no disponible en host** → la BD está en Docker, `pg_dump` no está en Windows. Solución: el endpoint `GET /api/backup/descargar` ejecuta `docker exec -i maxan_db_dev pg_dump ...` en lugar de llamar a pg_dump directamente. Configurable via `DB_USE_DOCKER=false` en `.env` para entornos con pg_dump nativo.
 
 ## Cálculo de utilidad (`vw_utilidad_productos`)
 - **costo_adquisiciones** = SUM(entradas.cantidad × costo_unitario) — todo lo que entró a inventario (gastos Suministros que generan entrada via trigger)
@@ -252,6 +270,12 @@ docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp
 
 # Limpiar BD
 docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp -c "TRUNCATE TABLE facturacion.factura_archivos, facturacion.factura_impuestos, facturacion.factura_respuestas_dian, facturacion.ventas_items, facturacion.ventas, facturacion.terceros, compras.facturas_compra_archivos, compras.facturas_compra, gastos.gastos, inventario.salida_detalle, inventario.salidas, inventario.entradas, inventario.productos, inventario.categorias CASCADE;"
+
+# Backup BD
+curl -H "Authorization: Bearer <token>" http://localhost:3000/api/backup/descargar -o backup.dump
+
+# Restaurar backup
+docker exec -i maxan_db_dev pg_restore -U maxan_user -d maxan_erp --clean < backup.dump
 ```
 
 ## Conexión BD
@@ -259,4 +283,91 @@ docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp -c "TRUNCATE TABLE 
 - User: maxan_user
 - Pass: dev_password_segura
 - DB: maxan_erp
-- Schema: facturacion, compras, inventario, gastos, cartera, public
+- Schema: facturacion, compras, inventario, gastos, cartera, public, helpdesk
+
+## Módulo Helpdesk
+
+### Schema `helpdesk` (db/16_helpdesk_schema.sql, db/17_helpdesk_atributos.sql)
+- **categorias_mantenimiento** — 7 categorías: Preventivo, Correctivo, Instalación, Diagnóstico, Remoto, Formateo, Redes
+- **recursos** — Equipos informáticos de clientes (Computador, Hosting, Office 365, Red, etc.)
+  - FK: `cliente_id` → `facturacion.terceros(id)`
+  - `serial` UNIQUE para detección de duplicados
+  - Columnas fijas: marca, modelo, serial, procesador, memoria_gb, almacenamiento_gb, sistema_operativo
+  - `atributos JSONB` — Campos variables según el tipo (tipo_almacenamiento, chip_video, memoria_video_mb, plan, licencias, fecha_vencimiento, proveedor, dominio, IP, firmware, etc.)
+- **mantenimientos** — Tickets/casos de soporte vinculados a un recurso
+  - Estados: Pendiente → En Progreso → Completado → Facturado / Cancelado
+  - Costos: mano_obra + repuestos = costo_total (GENERATED ALWAYS)
+  - Vincular a `facturacion.ventas_items` para facturación
+- **mantenimiento_detalles** — Bitácora de cada mantenimiento (comentarios, diagnóstico, solución, repuestos)
+
+### Seed desde Notion
+La migración `16_helpdesk_schema.sql` incluye:
+- 14 clientes como `facturacion.terceros` (Gestión Calidad, Transglobal, Montacargas, Promatel, etc.)
+- 35+ recursos informáticos migrados desde la base de Notion "Recursos Informáticos"
+
+### Backend — Rutas
+| Endpoint | Método | Permiso | Descripción |
+|----------|--------|---------|-------------|
+| `/api/helpdesk/recursos` | GET | `helpdesk.ver` | Listar recursos (filtros: `q`, `cliente_id`, `tipo`) |
+| `/api/helpdesk/recursos/:id` | GET | `helpdesk.ver` | Obtener recurso |
+| `/api/helpdesk/recursos` | POST | `helpdesk.gestionar` | Crear recurso |
+| `/api/helpdesk/recursos/:id` | PUT | `helpdesk.gestionar` | Actualizar recurso |
+| `/api/helpdesk/recursos/:id` | DELETE | `helpdesk.gestionar` | Eliminar recurso |
+| `/api/helpdesk/recursos/script` | GET | `helpdesk.ver` | Generar script PowerShell para detectar PC (query params: `?session=UUID&cliente_id=X`, `?format=bat`) |
+| `/api/helpdesk/recursos/detectar-pc` | POST | **Público** (sin auth) | Recibir datos desde script PS — almacena en memoria con `session_code` |
+| `/api/helpdesk/recursos/detectar-pc/pending/:session_code` | GET | `helpdesk.ver` | Obtener datos pendientes de detección del PC |
+| `/api/helpdesk/mantenimientos` | GET/POST | `helpdesk.ver`/`.gestionar` | CRUD mantenimientos |
+| `/api/helpdesk/mantenimientos/:id` | GET/PUT | `helpdesk.ver`/`.gestionar` | CRUD mantenimientos |
+| `/api/helpdesk/detalles/:mantenimiento_id` | GET/POST | `helpdesk.ver`/`.gestionar` | Bitácora de mantenimiento |
+| `/api/helpdesk/categorias-mantenimiento` | GET | `helpdesk.ver` | Listar categorías |
+| `/api/helpdesk/casos` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | CRUD casos de soporte |
+| `/api/helpdesk/casos/:id` | GET/PUT | `helpdesk.casos.ver`/`.gestionar` | Obtener/editar caso |
+| `/api/helpdesk/casos/:id/estado` | PATCH | `helpdesk.casos.gestionar` | Cambiar estado + registrar solución |
+| `/api/helpdesk/casos/:id/detalles` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | Bitácora del caso |
+| `/api/helpdesk/contactos` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | CRUD contactos de clientes |
+| `/api/helpdesk/contactos/:id` | GET/PUT/DELETE | `helpdesk.casos.ver`/`.gestionar` | CRUD contacto individual |
+| `/api/helpdesk/categorias-caso` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | Categorías editables de caso |
+| `/api/helpdesk/categorias-caso/:id` | PUT/DELETE | `helpdesk.casos.gestionar` | Editar/eliminar categoría |
+
+### Frontend — Páginas
+| Ruta | Componente | Permiso | Descripción |
+|------|-----------|---------|-------------|
+| `/helpdesk` | `Clientes.tsx` | `helpdesk.ver` | Seleccionar cliente para trabajar |
+| `/helpdesk/clientes/:id` | `ClienteDetalle.tsx` | `helpdesk.ver` | Recursos del cliente |
+| `/helpdesk/recursos/:id` | `RecursoDetalle.tsx` | `helpdesk.ver` | Detalle del equipo + historial de mantenimientos. Modo edición con botón "Editar" (requiere `helpdesk.gestionar`), formulario completo con todos los campos fijos y `atributos` (tipo disco, chip video, VRAM). |
+| `/helpdesk/obtener-pc` | `RegistrarPC.tsx` | `helpdesk.gestionar` | Detectar PC: botón copiar script PS + formulario manual |
+| `/helpdesk/casos` | `Casos.tsx` | `helpdesk.casos.ver` | Listado de casos con filtros (búsqueda, estado), tabla con #, título, cliente, categoría, técnico, estado. |
+| `/helpdesk/casos/nuevo` | `CasoNuevo.tsx` | `helpdesk.casos.gestionar` | Formulario crear caso: título, descripción, categoría, técnico, cliente con búsqueda. |
+| `/helpdesk/casos/:id` | `CasoDetalle.tsx` | `helpdesk.casos.ver` | Detalle del caso con bitácora, cambio de estado (Iniciar/Completar/Cancelar), campo de solución al cerrar. |
+| `/helpdesk/categorias-caso` | `CategoriasCaso.tsx` | `helpdesk.casos.gestionar` | Administrar categorías (agregar/eliminar con selector de color). |
+
+### Permisos (seed automático)
+| Código | Módulo | Descripción |
+|--------|--------|-------------|
+| `helpdesk.ver` | Helpdesk | Ver recursos y mantenimientos |
+| `helpdesk.gestionar` | Helpdesk | Crear/editar recursos y mantenimientos |
+| `helpdesk.casos.ver` | Helpdesk | Ver casos de soporte |
+| `helpdesk.casos.gestionar` | Helpdesk | Crear/editar/cerrar casos de soporte |
+
+### Flujo Detectar PC
+1. Técnico abre `/helpdesk/obtener-pc` (o desde un cliente con `?cliente=ID`)
+2. Selecciona el cliente y presiona **"Obtener script"**
+3. Se genera un `session_code` UUID único via `crypto.randomUUID()`, se pasa como `?session=UUID&cliente_id=X` al backend, y el script PowerShell se copia al portapapeles (o se descarga como `.bat`)
+4. En el PC del cliente: PowerShell como Administrador → pegar → Enter
+5. Script recolecta: nombre PC, serial (BIOS), marca, modelo, procesador, RAM, disco, SO, tipo disco (SSD/HDD), chip de video, VRAM
+6. Envía vía `POST /api/helpdesk/recursos/detectar-pc` (endpoint **público**, sin JWT)
+7. Backend **NO guarda en BD** — almacena los datos en un `Map` en memoria indexado por `session_code`
+8. Backend verifica si el serial ya existe en BD y lo informa en la respuesta
+9. Técnico presiona **"Ya ejecuté el script"** → `GET /api/helpdesk/recursos/detectar-pc/pending/:session_code`
+10. Se muestran los datos detectados en pantalla con advertencia si el serial ya existe
+11. Técnico revisa y presiona **"Guardar equipo"** → `POST /api/helpdesk/recursos` (autenticado, requiere `helpdesk.gestionar`)
+12. Opcional: "Editar datos antes de guardar" abre formulario manual pre-cargado
+13. Formulario manual siempre disponible como alternativa (Opción 2)
+
+### Notas técnicas del script
+- El endpoint `GET /script` devuelve PowerShell plano por defecto. Con `?format=bat` devuelve un wrapper `.bat` que usa `-EncodedCommand` con Base64 en UTF-16LE para evitar problemas de escaping en CMD.
+- El `.bat` invoca: `powershell -ExecutionPolicy Bypass -NoProfile -EncodedCommand <base64>`
+- El script incluye `Read-Host "Presiona Enter para salir"` al final para mantener la ventana abierta.
+- Datos no reclamados se limpian automáticamente después de 30 minutos.
+- Detección de tipo de disco (SSD/HDD) vía `MSFT_PhysicalDisk` (fallback a `Win32_DiskDrive`).
+- Detección de chip de video + VRAM vía `Win32_VideoController`.

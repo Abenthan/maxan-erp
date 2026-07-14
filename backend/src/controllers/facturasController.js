@@ -2,13 +2,14 @@ function getPool(req) {
   return req.app.locals.pool;
 }
 
-async function upsertTercero(client, tercero) {
+async function upsertTercero(client, tercero, extra = {}) {
+  const { es_cliente, es_proveedor } = extra;
   const q = `
     INSERT INTO facturacion.terceros
       (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
        razon_social, direccion, codigo_ciudad, ciudad, departamento, pais,
-       telefono, email)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       telefono, email, es_cliente, es_proveedor)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
     ON CONFLICT (tipo_documento, numero_documento)
     DO UPDATE SET
       razon_social = EXCLUDED.razon_social,
@@ -17,6 +18,8 @@ async function upsertTercero(client, tercero) {
       departamento = EXCLUDED.departamento,
       email = EXCLUDED.email,
       telefono = EXCLUDED.telefono,
+      es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE facturacion.terceros.es_cliente END,
+      es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE facturacion.terceros.es_proveedor END,
       updated_at = now()
     RETURNING id`;
   const vals = [
@@ -32,6 +35,8 @@ async function upsertTercero(client, tercero) {
     "CO",
     tercero.telefono || null,
     tercero.email || null,
+    es_cliente || false,
+    es_proveedor || false,
   ];
   const result = await client.query(q, vals);
   return result.rows[0].id;
@@ -136,8 +141,8 @@ async function create(req, res) {
 
     await client.query("BEGIN");
 
-    const emisorId = await upsertTercero(client, data.emisor);
-    const receptorId = await upsertTercero(client, data.receptor);
+    const emisorId = await upsertTercero(client, data.emisor, { es_proveedor: true });
+    const receptorId = await upsertTercero(client, data.receptor, { es_cliente: true });
 
     if (data.cufe) {
       const dup = await client.query(

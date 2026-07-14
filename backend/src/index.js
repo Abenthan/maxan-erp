@@ -21,6 +21,15 @@ const dashboardRouter = require("./routes/dashboard");
 const carteraRouter = require("./routes/cartera");
 const clasificacionesGastoRouter = require("./routes/clasificacionesGasto");
 const tercerosRouter = require("./routes/terceros");
+const helpdeskRecursosRouter = require("./routes/helpdesk/recursos");
+const helpdeskRecursosController = require("./controllers/helpdesk/recursosController");
+const helpdeskMantenimientosRouter = require("./routes/helpdesk/mantenimientos");
+const helpdeskDetallesRouter = require("./routes/helpdesk/detalles");
+const helpdeskCategoriasRouter = require("./routes/helpdesk/categorias");
+const helpdeskCasosRouter = require("./routes/helpdesk/casos");
+const helpdeskContactosRouter = require("./routes/helpdesk/contactos");
+const helpdeskCategoriasCasoRouter = require("./routes/helpdesk/categoriasCaso");
+const backupRouter = require("./routes/backup");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,6 +52,9 @@ app.use("/api/auth", authRouter);
 app.use("/api/usuarios", usuariosRouter);
 app.use("/api/roles", rolesRouter);
 app.use("/api/permisos", permisosRouter);
+app.use("/api/backup", backupRouter);
+
+app.post("/api/helpdesk/recursos/detectar-pc", helpdeskRecursosController.detectarPC);
 
 const apiRouter = express.Router();
 apiRouter.use(authenticate);
@@ -59,6 +71,13 @@ apiRouter.use("/ventas", ventasRouter);
 apiRouter.use("/dashboard", dashboardRouter);
 apiRouter.use("/cartera", carteraRouter);
 apiRouter.use("/terceros", tercerosRouter);
+apiRouter.use("/helpdesk/recursos", helpdeskRecursosRouter);
+apiRouter.use("/helpdesk/mantenimientos", helpdeskMantenimientosRouter);
+apiRouter.use("/helpdesk/detalles", helpdeskDetallesRouter);
+apiRouter.use("/helpdesk/categorias-mantenimiento", helpdeskCategoriasRouter);
+apiRouter.use("/helpdesk/casos", helpdeskCasosRouter);
+apiRouter.use("/helpdesk/contactos", helpdeskContactosRouter);
+apiRouter.use("/helpdesk/categorias-caso", helpdeskCategoriasCasoRouter);
 
 app.use("/api", apiRouter);
 

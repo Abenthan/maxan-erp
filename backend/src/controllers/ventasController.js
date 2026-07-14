@@ -99,14 +99,15 @@ async function create(req, res) {
 
     const upsertQ = `
       INSERT INTO facturacion.terceros
-        (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
+        (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,true)
       ON CONFLICT (tipo_documento, numero_documento)
       DO UPDATE SET
         razon_social = EXCLUDED.razon_social,
         direccion = EXCLUDED.direccion,
         ciudad = EXCLUDED.ciudad,
         departamento = EXCLUDED.departamento,
+        es_cliente = true,
         updated_at = now()
       RETURNING id`;
 
@@ -270,14 +271,15 @@ async function update(req, res) {
 
     const upsertQ = `
       INSERT INTO facturacion.terceros
-        (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
+        (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,true)
       ON CONFLICT (tipo_documento, numero_documento)
       DO UPDATE SET
         razon_social = EXCLUDED.razon_social,
         direccion = EXCLUDED.direccion,
         ciudad = EXCLUDED.ciudad,
         departamento = EXCLUDED.departamento,
+        es_cliente = true,
         updated_at = now()
       RETURNING id`;
 

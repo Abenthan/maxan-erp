@@ -4,7 +4,7 @@ function getPool(req) {
 
 async function list(req, res) {
   const pool = getPool(req);
-  const { q, tipo_documento } = req.query;
+  const { q, tipo_documento, tipo } = req.query;
 
   try {
     let sql = "SELECT * FROM facturacion.terceros WHERE 1=1";
@@ -19,6 +19,13 @@ async function list(req, res) {
     if (tipo_documento) {
       sql += ` AND tipo_documento = $${idx++}`;
       params.push(tipo_documento);
+    }
+    if (tipo === "cliente") {
+      sql += ` AND es_cliente = $${idx++}`;
+      params.push(true);
+    } else if (tipo === "proveedor") {
+      sql += ` AND es_proveedor = $${idx++}`;
+      params.push(true);
     }
 
     sql += " ORDER BY razon_social";
@@ -48,6 +55,7 @@ async function create(req, res) {
     tipo_documento, numero_documento, digito_verificacion, tipo_persona,
     razon_social, direccion, codigo_ciudad, ciudad, codigo_departamento,
     departamento, codigo_postal, pais, telefono, email, es_propio,
+    es_cliente, es_proveedor,
   } = req.body;
 
   if (!tipo_documento || !numero_documento || !razon_social) {
@@ -59,8 +67,9 @@ async function create(req, res) {
       `INSERT INTO facturacion.terceros
         (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
          razon_social, direccion, codigo_ciudad, ciudad, codigo_departamento,
-         departamento, codigo_postal, pais, telefono, email, es_propio)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         departamento, codigo_postal, pais, telefono, email, es_propio,
+         es_cliente, es_proveedor)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        ON CONFLICT (tipo_documento, numero_documento)
        DO UPDATE SET
          razon_social = EXCLUDED.razon_social,
@@ -69,6 +78,8 @@ async function create(req, res) {
          departamento = EXCLUDED.departamento,
          telefono = EXCLUDED.telefono,
          email = EXCLUDED.email,
+         es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE facturacion.terceros.es_cliente END,
+         es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE facturacion.terceros.es_proveedor END,
          updated_at = now()
        RETURNING *`,
       [
@@ -76,6 +87,7 @@ async function create(req, res) {
         razon_social, direccion || null, codigo_ciudad || null, ciudad || null,
         codigo_departamento || null, departamento || null, codigo_postal || null,
         pais || "CO", telefono || null, email || null, es_propio || false,
+        es_cliente ?? false, es_proveedor ?? false,
       ]
     );
     res.status(201).json(result.rows[0]);
@@ -101,8 +113,9 @@ async function update(req, res) {
         tipo_persona = $4, razon_social = $5, direccion = $6,
         codigo_ciudad = $7, ciudad = $8, codigo_departamento = $9,
         departamento = $10, codigo_postal = $11, pais = $12,
-        telefono = $13, email = $14, es_propio = $15, updated_at = now()
-       WHERE id = $16 RETURNING *`,
+        telefono = $13, email = $14, es_propio = $15,
+        es_cliente = $16, es_proveedor = $17, updated_at = now()
+       WHERE id = $18 RETURNING *`,
       [
         actualizado.tipo_documento, actualizado.numero_documento,
         actualizado.digito_verificacion, actualizado.tipo_persona,
@@ -111,6 +124,7 @@ async function update(req, res) {
         actualizado.codigo_departamento, actualizado.departamento,
         actualizado.codigo_postal, actualizado.pais,
         actualizado.telefono, actualizado.email, actualizado.es_propio,
+        actualizado.es_cliente ?? false, actualizado.es_proveedor ?? false,
         id,
       ]
     );
@@ -125,6 +139,9 @@ async function update(req, res) {
 }
 
 async function remove(req, res) {
+  if (!req.user.permisos.includes("usuarios.gestionar")) {
+    return res.status(403).json({ error: "Solo administradores pueden eliminar terceros" });
+  }
   const pool = getPool(req);
   try {
     const result = await pool.query("DELETE FROM facturacion.terceros WHERE id = $1 RETURNING *", [req.params.id]);

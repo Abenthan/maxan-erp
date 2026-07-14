@@ -218,7 +218,7 @@ export default function Cartera() {
         <h1 className="text-2xl font-bold text-gray-900">Cartera</h1>
         {puedeGestionar && (
           <button
-            onClick={() => navigate("/cartera/nuevo-pago")}
+            onClick={() => navigate("/financiero/cartera/nuevo-pago")}
             className="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700"
           >
             + Nuevo Pago
@@ -310,7 +310,7 @@ export default function Cartera() {
                     <td className="p-3">
                       <div className="flex gap-1">
                         <button
-                          onClick={() => window.open(`/factura/${it.venta_id}`, "_blank")}
+                          onClick={() => window.open(`/financiero/factura/${it.venta_id}`, "_blank")}
                           className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-lg hover:bg-blue-200"
                         >
                           Ver

@@ -223,7 +223,7 @@ export default function Productos() {
                   <td className="p-3">
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/inventario/movimientos?producto_id=${p.id}&nombre=${encodeURIComponent(p.nombre)}`); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/financiero/inventario/movimientos?producto_id=${p.id}&nombre=${encodeURIComponent(p.nombre)}`); }}
                       className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
                     >
                       Stock
@@ -232,7 +232,7 @@ export default function Productos() {
                   <td className="p-3">
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/gastos?producto_id=${p.id}&nombre=${encodeURIComponent(p.nombre)}`); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/financiero/gastos?producto_id=${p.id}&nombre=${encodeURIComponent(p.nombre)}`); }}
                       className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
                     >
                       Gastos

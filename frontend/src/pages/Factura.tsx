@@ -64,7 +64,7 @@ export default function Factura() {
   return (
     <div className="max-w-4xl">
       <div className="mb-4">
-        <Link to="/facturas" className="text-blue-600 hover:underline text-sm">&larr; Volver a facturas</Link>
+        <Link to="/financiero/facturas" className="text-blue-600 hover:underline text-sm">&larr; Volver a facturas</Link>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">

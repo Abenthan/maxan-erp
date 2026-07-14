@@ -119,7 +119,7 @@ export default function NuevaVenta() {
     if (cliente.length < 2) { setSugerencias([]); setMostrarSugerencias(false); return; }
     setBuscando(true);
     const timer = setTimeout(() => {
-      api.get<ClienteResult[]>(`/terceros?q=${encodeURIComponent(cliente)}`)
+      api.get<ClienteResult[]>(`/terceros?tipo=cliente&q=${encodeURIComponent(cliente)}`)
         .then((res) => { setSugerencias(res); setMostrarSugerencias(res.length > 0); })
         .catch(() => {})
         .finally(() => setBuscando(false));
@@ -327,7 +327,7 @@ export default function NuevaVenta() {
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700 flex items-center justify-between">
           <span>{exito}</span>
           <button
-            onClick={() => navigate("/ventas-items")}
+            onClick={() => navigate("/financiero/ventas-items")}
             className="px-3 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700"
           >
             Ver items

@@ -163,7 +163,7 @@ export default function GastosPorVentaItem() {
     <div>
       <div className="flex items-center gap-3 mb-6">
         <button
-          onClick={() => navigate("/ventas-items")}
+          onClick={() => navigate("/financiero/ventas-items")}
           className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
         >
           ← Volver

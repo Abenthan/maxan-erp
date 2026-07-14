@@ -266,20 +266,20 @@ export default function VentasItems() {
                             </button>
                           )}
                           <button
-                            onClick={() => navigate(`/factura/${it.venta_id}`)}
+                            onClick={() => navigate(`/financiero/factura/${it.venta_id}`)}
                             className="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
                           >
                             Ver
                           </button>
                           <button
-                            onClick={() => navigate(`/ventas-items/${it.id}/gastos`)}
+                            onClick={() => navigate(`/financiero/ventas-items/${it.id}/gastos`)}
                             className="px-2.5 py-1 text-xs font-medium rounded-lg border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
                           >
                             Gastos
                           </button>
                           {!it.cufe && puedeCrearVenta && (
                             <button
-                              onClick={() => navigate(`/nueva-venta/${it.venta_id}`)}
+                              onClick={() => navigate(`/financiero/nueva-venta/${it.venta_id}`)}
                               className="px-2.5 py-1 text-xs font-medium rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
                             >
                               Editar

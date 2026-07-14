@@ -129,7 +129,7 @@ export default function NuevaFactura() {
         "/facturas/parsear-xml", text
       );
       if (json.ya_existe && json.factura_existente_id) {
-        navigate(`/factura/${json.factura_existente_id}`);
+        navigate(`/financiero/factura/${json.factura_existente_id}`);
         return;
       }
       setFactura(json);
@@ -147,7 +147,7 @@ export default function NuevaFactura() {
     setSuccess("");
     try {
       await api.post<{ success: boolean; factura_id: number }>("/facturas", factura);
-      navigate("/facturas");
+      navigate("/financiero/facturas");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       if (msg.includes("duplicado") || msg.includes("ya está registrada")) {
@@ -185,7 +185,7 @@ export default function NuevaFactura() {
             {duplicadoId && (
               <p className="mt-2">
                 <span className="text-red-600 font-medium">Esta factura ya está registrada. </span>
-                <Link to={`/factura/${duplicadoId}`} className="text-blue-600 underline font-medium">
+                <Link to={`/financiero/factura/${duplicadoId}`} className="text-blue-600 underline font-medium">
                   Ver factura existente
                 </Link>
               </p>
@@ -383,7 +383,7 @@ export default function NuevaFactura() {
 
                 <div className="flex gap-3 justify-end">
                 <button
-                  onClick={() => navigate("/facturas")}
+                  onClick={() => navigate("/financiero/facturas")}
                   className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   Volver

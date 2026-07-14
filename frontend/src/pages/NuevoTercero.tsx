@@ -18,6 +18,8 @@ export default function NuevoTercero() {
     telefono: "",
     email: "",
     es_propio: false,
+    es_cliente: true,
+    es_proveedor: true,
   });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -33,7 +35,7 @@ export default function NuevoTercero() {
     setError("");
     try {
       await api.post("/terceros", form);
-      navigate("/terceros");
+      navigate(-1);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error al guardar");
     } finally {
@@ -46,7 +48,7 @@ export default function NuevoTercero() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Nuevo Tercero</h1>
         <button
-          onClick={() => navigate("/terceros")}
+          onClick={() => navigate(-1)}
           className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
         >
           Volver
@@ -153,21 +155,43 @@ export default function NuevoTercero() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="es_propio"
-              checked={form.es_propio}
-              onChange={(e) => setField("es_propio", e.target.checked)}
-              className="rounded border-gray-300"
-            />
-            <label htmlFor="es_propio" className="text-sm text-gray-600">Es empresa propia</label>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="es_cliente"
+                checked={form.es_cliente}
+                onChange={(e) => setField("es_cliente", e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="es_cliente" className="text-sm text-gray-600">Es cliente</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="es_proveedor"
+                checked={form.es_proveedor}
+                onChange={(e) => setField("es_proveedor", e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="es_proveedor" className="text-sm text-gray-600">Es proveedor</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="es_propio"
+                checked={form.es_propio}
+                onChange={(e) => setField("es_propio", e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="es_propio" className="text-sm text-gray-600">Es empresa propia</label>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={() => navigate("/terceros")}
+              onClick={() => navigate(-1)}
               className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               Cancelar

@@ -74,7 +74,7 @@ export default function CompraDetalle() {
   return (
     <div className="max-w-4xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link to="/compras" className="text-blue-600 hover:underline text-sm">&larr; Volver</Link>
+        <Link to="/financiero/compras" className="text-blue-600 hover:underline text-sm">&larr; Volver</Link>
         <h1 className="text-2xl font-bold text-gray-900">Compra {data.numero_completo}</h1>
         <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${estadoBadge[data.estado] || "bg-gray-100 text-gray-800"}`}>
           {data.estado.replace("_", " ")}

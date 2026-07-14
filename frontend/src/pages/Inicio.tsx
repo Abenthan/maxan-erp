@@ -1,132 +1,115 @@
-import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { useDashboard } from "../context/DashboardContext";
-import { useApi } from "../context/ApiContext";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const modulos = [
   {
-    to: "/facturas",
-    titulo: "Facturación",
-    desc: "Facturas electrónicas DIAN, consulta y gestión de ventas",
-    icono: "📄",
-    color: "blue",
-  },
-  {
-    to: "/productos",
-    titulo: "Productos",
-    desc: "Catálogo de productos, servicios e inventariables",
-    icono: "📦",
-    color: "emerald",
-  },
-  {
-    to: "/compras",
-    titulo: "Compras",
-    desc: "Facturas de proveedores y documentos soporte",
-    icono: "📥",
-    color: "violet",
-  },
-  {
-    to: "/gastos",
-    titulo: "Gastos",
-    desc: "Gastos operacionales, administrativos y suministros",
+    id: "financiero",
+    titulo: "Financiero",
+    desc: "Facturación electrónica, compras, inventario, cartera, gastos y más",
     icono: "💰",
-    color: "amber",
+    gradient: "from-blue-500 to-blue-600",
+    bgLight: "bg-blue-50",
+    textColor: "text-blue-700",
+    ruta: "/financiero",
   },
   {
-    to: "/inventario",
-    titulo: "Inventario",
-    desc: "Stock disponible, movimientos y consumo FIFO",
-    icono: "📊",
-    color: "rose",
+    id: "clientes",
+    titulo: "Clientes",
+    desc: "Gestión de terceros, clientes y proveedores",
+    icono: "👤",
+    gradient: "from-teal-500 to-teal-600",
+    bgLight: "bg-teal-50",
+    textColor: "text-teal-700",
+    ruta: "/terceros",
   },
-];
-
-const colorClasses: Record<string, { bg: string; text: string; hover: string }> = {
-  blue: { bg: "bg-blue-50", text: "text-blue-700", hover: "hover:bg-blue-100" },
-  emerald: { bg: "bg-emerald-50", text: "text-emerald-700", hover: "hover:bg-emerald-100" },
-  violet: { bg: "bg-violet-50", text: "text-violet-700", hover: "hover:bg-violet-100" },
-  amber: { bg: "bg-amber-50", text: "text-amber-700", hover: "hover:bg-amber-100" },
-  rose: { bg: "bg-rose-50", text: "text-rose-700", hover: "hover:bg-rose-100" },
-};
-
-const resumenCards = [
-  { key: "facturas" as const, label: "Facturas", color: "text-blue-600" },
-  { key: "productos" as const, label: "Productos", color: "text-emerald-600" },
-  { key: "gastos" as const, label: "Gastos", color: "text-amber-600" },
-  { key: "compras" as const, label: "Compras", color: "text-violet-600" },
+  {
+    id: "helpdesk",
+    titulo: "Mesa de Ayuda",
+    desc: "Gestión de recursos informáticos, mantenimientos y soporte a clientes",
+    icono: "🖥️",
+    gradient: "from-amber-500 to-amber-600",
+    bgLight: "bg-amber-50",
+    textColor: "text-amber-700",
+    ruta: "/helpdesk",
+  },
+  {
+    id: "configuracion",
+    titulo: "Configuración",
+    desc: "Usuarios, roles, permisos y copia de seguridad",
+    icono: "⚙️",
+    gradient: "from-gray-500 to-gray-600",
+    bgLight: "bg-gray-50",
+    textColor: "text-gray-700",
+    ruta: "/configuracion/usuarios",
+  },
+  {
+    id: "crm",
+    titulo: "CRM",
+    desc: "Gestión de clientes, oportunidades y relaciones comerciales",
+    icono: "🤝",
+    gradient: "from-emerald-500 to-emerald-600",
+    bgLight: "bg-emerald-50",
+    textColor: "text-emerald-700",
+    ruta: "/crm",
+  },
 ];
 
 export default function Inicio() {
-  const api = useApi();
-  const { data: resumen, loading: resumenLoading } = useDashboard();
-  const [salud, setSalud] = useState<string>("");
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    api.get<{ db: string }>("/health")
-      .then((d) => setSalud(d.db === "connected" ? "Conectado" : "Desconectado"))
-      .catch(() => setSalud("Sin conexión"));
-  }, [api]);
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Panel Principal</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Base de datos:{" "}
-            <span
-              className={`font-medium ${
-                salud === "Conectado" ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {salud || "Verificando..."}
-            </span>
-          </p>
-        </div>
-        <span className="text-sm text-gray-400">
-          {new Date().toLocaleDateString("es-CO", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {modulos.map((m) => {
-          const c = colorClasses[m.color];
-          return (
-            <Link
-              key={m.to}
-              to={m.to}
-              className={`block rounded-xl border border-gray-200 bg-white p-5 ${c.hover} transition-all hover:shadow-md hover:-translate-y-0.5`}
-            >
-              <div
-                className={`w-11 h-11 rounded-lg ${c.bg} flex items-center justify-center text-xl mb-3`}
-              >
-                {m.icono}
-              </div>
-              <h3 className={`font-semibold text-base ${c.text}`}>{m.titulo}</h3>
-              <p className="text-sm text-gray-500 mt-1 leading-snug">{m.desc}</p>
-            </Link>
-          );
-        })}
-      </div>
-
-      <div className="mt-10 bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">Resumen rápido</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-          {resumenCards.map((card) => (
-            <div key={card.key} className="p-3 bg-gray-50 rounded-lg">
-              <div className={`text-2xl font-bold ${card.color}`}>
-                {resumenLoading ? "..." : resumen?.[card.key] ?? "--"}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">{card.label}</div>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
+          <span className="text-lg font-bold text-gray-800">Maxan ERP</span>
+        {user && (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">{user.nombres} {user.apellidos}</span>
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
+              {user.nombres?.charAt(0)}{user.apellidos?.charAt(0)}
             </div>
-          ))}
+            <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-red-600">
+              Cerrar sesión
+            </button>
+          </div>
+        )}
+        {!user && <span className="text-sm text-gray-500">Selecciona un módulo</span>}
+      </header>
+
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="max-w-4xl w-full">
+          <div className="text-center mb-10">
+            <p className="text-sm text-gray-400 uppercase tracking-widest font-medium">Bienvenido</p>
+            <h1 className="text-3xl font-bold text-gray-900 mt-1">¿Qué deseas hacer?</h1>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+            {modulos.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => navigate(m.ruta)}
+                className={`group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 text-left transition-all hover:shadow-lg hover:-translate-y-1 ${m.bgLight}`}
+              >
+                <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${m.gradient} flex items-center justify-center text-2xl mb-4 shadow-sm`}>
+                  {m.icono}
+                </div>
+                <h3 className={`text-xl font-bold ${m.textColor}`}>{m.titulo}</h3>
+                <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">{m.desc}</p>
+                <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${m.gradient} scale-x-0 group-hover:scale-x-100 transition-transform origin-left`} />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      <footer className="h-10 flex items-center justify-center text-xs text-gray-400 border-t border-gray-100">
+        Maxan Sistemas &copy; {new Date().getFullYear()}
+      </footer>
     </div>
   );
 }

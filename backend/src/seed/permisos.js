@@ -18,6 +18,10 @@ const permisosPorDefecto = [
   { codigo: "terceros.gestionar", nombre: "Crear/editar/eliminar terceros", modulo: "Terceros" },
   { codigo: "utilidad.ver", nombre: "Ver reporte de utilidad", modulo: "Utilidad" },
   { codigo: "usuarios.gestionar", nombre: "Gestionar usuarios, roles y permisos", modulo: "Administración" },
+  { codigo: "helpdesk.ver", nombre: "Ver recursos y mantenimientos", modulo: "Helpdesk" },
+  { codigo: "helpdesk.gestionar", nombre: "Crear/editar recursos y mantenimientos", modulo: "Helpdesk" },
+  { codigo: "helpdesk.casos.ver", nombre: "Ver casos de soporte", modulo: "Helpdesk" },
+  { codigo: "helpdesk.casos.gestionar", nombre: "Crear/editar/cerrar casos de soporte", modulo: "Helpdesk" },
 ];
 
 async function seedPermisos(pool) {

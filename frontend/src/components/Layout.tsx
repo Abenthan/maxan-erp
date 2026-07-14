@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import type { ReactNode } from "react";
 
@@ -21,36 +21,36 @@ const ALL_GROUPS: NavGroup[] = [
     label: "VENTAS",
     bg: "bg-blue-50",
     items: [
-      { to: "/facturas", label: "Facturación", icon: "📄", permiso: "facturas.ver" },
-      { to: "/ventas-items", label: "Ventas Items", icon: "📋", permiso: "ventas.ver" },
-      { to: "/nueva-venta", label: "Nueva Venta", icon: "➕", permiso: "ventas.crear" },
-      { to: "/terceros", label: "Terceros", icon: "👤", permiso: "terceros.ver" },
+      { to: "/financiero/facturas", label: "Facturación", icon: "📄", permiso: "facturas.ver" },
+      { to: "/financiero/ventas-items", label: "Ventas Items", icon: "📋", permiso: "ventas.ver" },
+      { to: "/financiero/nueva-venta", label: "Nueva Venta", icon: "➕", permiso: "ventas.crear" },
+      { to: "/financiero/terceros", label: "Terceros", icon: "👤", permiso: "terceros.ver" },
     ],
   },
   {
     label: "COSTOS",
     bg: "bg-orange-50",
     items: [
-      { to: "/compras", label: "Compras", icon: "📥", permiso: "compras.ver" },
-      { to: "/gastos", label: "Gastos", icon: "💰", permiso: "gastos.ver" },
+      { to: "/financiero/compras", label: "Compras", icon: "📥", permiso: "compras.ver" },
+      { to: "/financiero/gastos", label: "Gastos", icon: "💰", permiso: "gastos.ver" },
     ],
   },
   {
     label: "CARTERA",
     bg: "bg-purple-50",
     items: [
-      { to: "/cartera", label: "Cartera", icon: "📋", permiso: "cartera.ver" },
-      { to: "/cartera/pagos", label: "Pagos", icon: "💳", permiso: "cartera.ver" },
-      { to: "/cartera/retenciones", label: "Retenciones", icon: "🧾", permiso: "cartera.ver" },
+      { to: "/financiero/cartera", label: "Cartera", icon: "📋", permiso: "cartera.ver" },
+      { to: "/financiero/cartera/pagos", label: "Pagos", icon: "💳", permiso: "cartera.ver" },
+      { to: "/financiero/cartera/retenciones", label: "Retenciones", icon: "🧾", permiso: "cartera.ver" },
     ],
   },
   {
     label: "INVENTARIO",
     bg: "bg-emerald-50",
     items: [
-      { to: "/productos", label: "Productos", icon: "📦", permiso: "productos.ver" },
-      { to: "/inventario", label: "Stock", icon: "📊", permiso: "inventario.ver" },
-      { to: "/inventario/movimientos", label: "Movimientos", icon: "🔄", permiso: "inventario.ver" },
+      { to: "/financiero/productos", label: "Productos", icon: "📦", permiso: "productos.ver" },
+      { to: "/financiero/inventario", label: "Stock", icon: "📊", permiso: "inventario.ver" },
+      { to: "/financiero/inventario/movimientos", label: "Movimientos", icon: "🔄", permiso: "inventario.ver" },
     ],
   },
 ];
@@ -69,19 +69,18 @@ export default function Layout({ children }: { children: ReactNode }) {
     return hasPermiso(item.permiso);
   }
 
-  const puedeAdmin = hasPermiso("usuarios.gestionar");
   const puedeUtilidad = hasPermiso("utilidad.ver");
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <aside className="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
         <div className="h-14 flex items-center px-5 border-b border-gray-200">
-          <span className="text-lg font-bold text-gray-800">Maxan ERP</span>
+          <Link to="/" className="text-lg font-bold text-gray-800 hover:text-blue-600">Maxan ERP</Link>
         </div>
         <nav className="flex-1 p-3 space-y-3 overflow-y-auto">
-          {puedeVer({ to: "/", label: "Dashboard", icon: "📊", end: true, permiso: "dashboard.ver" }) && (
+          {puedeVer({ to: "/financiero", label: "Dashboard", icon: "📊", end: true, permiso: "dashboard.ver" }) && (
             <NavLink
-              to="/"
+              to="/financiero"
               end
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -123,7 +122,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
           {puedeUtilidad && (
             <NavLink
-              to="/utilidad"
+              to="/financiero/utilidad"
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-100"
@@ -141,15 +140,15 @@ export default function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-end px-6 gap-4 shrink-0">
+        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate("/")} className="text-sm text-gray-400 hover:text-gray-600">
+              ← Inicio
+            </button>
+            <span className="text-sm font-bold text-gray-700">Financiero</span>
+          </div>
           {user && (
-            <>
-              {puedeAdmin && (
-                <div className="flex items-center gap-2 text-sm">
-                  <button onClick={() => navigate("/usuarios")} className="text-gray-500 hover:text-gray-700">Usuarios</button>
-                  <button onClick={() => navigate("/roles")} className="text-gray-500 hover:text-gray-700">Roles</button>
-                </div>
-              )}
+            <div className="flex items-center gap-3">
               <span className="text-sm text-gray-500">{user.nombres} {user.apellidos}</span>
               <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
                 {user.nombres.charAt(0)}{user.apellidos.charAt(0)}
@@ -157,7 +156,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-red-600">
                 Cerrar sesión
               </button>
-            </>
+            </div>
           )}
           {!user && <span className="text-sm text-gray-500">Maxan Sistemas</span>}
         </header>

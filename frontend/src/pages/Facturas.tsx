@@ -143,7 +143,7 @@ export default function Facturas() {
           </button>
           {puedeCrear && (
             <Link
-              to="/nueva-factura"
+              to="/financiero/nueva-factura"
               className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
             >
               + Nueva
@@ -239,7 +239,7 @@ export default function Facturas() {
                   </td>
                   <td className="p-3">
                     <Link
-                      to={`/factura/${f.id}`}
+                        to={`/financiero/factura/${f.id}`}
                       className="text-blue-600 hover:underline text-xs"
                     >
                       Ver

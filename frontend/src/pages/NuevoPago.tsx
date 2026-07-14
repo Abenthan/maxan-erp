@@ -157,7 +157,7 @@ export default function NuevoPago() {
         observaciones: observaciones || null,
         aplicaciones: apps,
       });
-      navigate("/cartera/pagos");
+      navigate("/financiero/cartera/pagos");
     } catch (e: any) {
       setError(e.message || "Error al guardar pago");
     } finally {

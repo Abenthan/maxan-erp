@@ -35,8 +35,8 @@ async function upload(req, res) {
       INSERT INTO facturacion.terceros
         (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
          razon_social, direccion, codigo_ciudad, ciudad, departamento, pais,
-         telefono, email)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         telefono, email, es_cliente, es_proveedor)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       ON CONFLICT (tipo_documento, numero_documento)
       DO UPDATE SET
         razon_social = EXCLUDED.razon_social,
@@ -45,6 +45,8 @@ async function upload(req, res) {
         departamento = EXCLUDED.departamento,
         email = EXCLUDED.email,
         telefono = EXCLUDED.telefono,
+        es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE facturacion.terceros.es_cliente END,
+        es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE facturacion.terceros.es_proveedor END,
         updated_at = now()
       RETURNING id`;
 
@@ -61,6 +63,8 @@ async function upload(req, res) {
       "CO",
       data.emisor.telefono || null,
       data.emisor.email || null,
+      false,
+      true,
     ];
     const emisorResult = await client.query(upsertQ, emisorVals);
     const proveedorId = emisorResult.rows[0].id;
@@ -78,6 +82,8 @@ async function upload(req, res) {
       "CO",
       data.receptor.telefono || null,
       data.receptor.email || null,
+      true,
+      false,
     ];
     const receptorResult = await client.query(upsertQ, receptorVals);
     const receptorId = receptorResult.rows[0].id;

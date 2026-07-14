@@ -74,7 +74,7 @@ async function dashboard(req, res) {
       `, params),
       pool.query(`
         SELECT id, razon_social, numero_documento FROM facturacion.terceros
-        WHERE id IN (SELECT DISTINCT receptor_id FROM facturacion.ventas) OR id IN (SELECT DISTINCT proveedor_id FROM compras.facturas_compra)
+        WHERE es_cliente = true OR id IN (SELECT DISTINCT receptor_id FROM facturacion.ventas)
         ORDER BY razon_social
       `),
       pool.query(`SELECT * FROM inventario.vw_utilidad_productos ORDER BY ingreso_ventas DESC LIMIT 10`),
