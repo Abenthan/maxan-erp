@@ -31,10 +31,6 @@ interface DashboardData {
   };
 }
 
-interface Cliente {
-  id: number; razon_social: string; numero_documento: string;
-}
-
 function formatCurrency(n: number): string {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
 }

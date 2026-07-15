@@ -83,7 +83,7 @@ export default function NuevaVenta() {
           setObservaciones(data.observaciones || "");
           if (data.items && data.items.length > 0) {
             setLineas(data.items.map((it) => {
-              const p = prods.find((pr) => pr.id === it.producto_id);
+              prods.find((pr) => pr.id === it.producto_id);
               return {
                 producto_id: it.producto_id,
                 codigoInput: it.codigo_producto || "",
@@ -183,7 +183,7 @@ export default function NuevaVenta() {
   function actualizarLinea(idx: number, campo: Exclude<keyof ItemLinea, "producto_id" | "codigo" | "nombre" | "inventariable">, valor: string) {
     setLineas((prev) => {
       const copia = [...prev];
-      (copia[idx] as Record<string, string>)[campo] = valor;
+      (copia[idx] as any)[campo] = valor;
       return copia;
     });
   }

@@ -74,6 +74,7 @@ interface FacturaData {
   receptor: Tercero;
   items: FacturaItem[];
   impuestos: FacturaImpuesto[];
+  factura_existente_id?: number;
 }
 
 function formatCurrency(n: number): string {

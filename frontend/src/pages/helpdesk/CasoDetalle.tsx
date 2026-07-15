@@ -6,7 +6,7 @@ import { usePermiso } from "../../context/AuthContext";
 interface Caso {
   id: number; numero: string; titulo: string; descripcion: string;
   estado: string; categoria_nombre: string; categoria_color: string;
-  tecnico_nombre: string; cliente_nombre: string; cliente_documento: string;
+  tecnico_nombre: string; cliente_nombre: string; cliente_documento: string; cliente_id: number;
   recurso_nombre: string; recurso_serial: string;
   recursos: { id: number; nombre: string; serial: string; tipo: string; marca: string; modelo: string }[];
   contacto_nombre: string; contacto_telefono: string; contacto_whatsapp: string;

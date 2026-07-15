@@ -14,7 +14,6 @@ export default function RegistrarPC() {
   const [buscando, setBuscando] = useState(false);
 
   const [sessionCode, setSessionCode] = useState("");
-  const [scriptTexto, setScriptTexto] = useState("");
   const [nombre, setNombre] = useState("");
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
@@ -34,7 +33,6 @@ export default function RegistrarPC() {
     try {
       const qs = `?cliente_id=${cliente.id}&session=${session}`;
       const script = await api.get<string>(`/helpdesk/recursos/script${qs}`);
-      setScriptTexto(script);
       await navigator.clipboard.writeText(script);
       setPaso("script");
     } catch {
@@ -71,7 +69,7 @@ export default function RegistrarPC() {
     if (!cliente) return alert("Selecciona un cliente primero");
     setGuardando(true);
     try {
-      const res = await api.post("/helpdesk/recursos", {
+      const res = await api.post<any>("/helpdesk/recursos", {
         cliente_id: cliente.id,
         nombre: nombre || serial,
         tipo: "Computador",
@@ -105,7 +103,7 @@ export default function RegistrarPC() {
     if (!cliente) return alert("Selecciona un cliente primero");
     setGuardando(true);
     try {
-      const res = await api.post("/helpdesk/recursos", {
+      const res = await api.post<any>("/helpdesk/recursos", {
         cliente_id: cliente.id,
         nombre: datosPC.nombre || datosPC.serial,
         tipo: "Computador",

@@ -189,7 +189,7 @@ export default function Cartera() {
         .map(([ventaId, valor]) => ({
           venta_id: parseInt(ventaId, 10),
           valor_aplicado: parseFloat(valor),
-          retencion: parseFloat(retenciones[ventaId] || "0") || undefined,
+          retencion: parseFloat(retenciones[parseInt(ventaId, 10)] || "0") || undefined,
         }));
 
       await api.post("/cartera/pagos", {
