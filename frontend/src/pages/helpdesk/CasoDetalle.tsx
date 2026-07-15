@@ -8,6 +8,7 @@ interface Caso {
   estado: string; categoria_nombre: string; categoria_color: string;
   tecnico_nombre: string; cliente_nombre: string; cliente_documento: string;
   recurso_nombre: string; recurso_serial: string;
+  recursos: { id: number; nombre: string; serial: string; tipo: string; marca: string; modelo: string }[];
   contacto_nombre: string; contacto_telefono: string; contacto_whatsapp: string;
   fuente: string; solucion: string; resumen: string; ai_report: string;
   created_at: string; updated_at: string;
@@ -15,6 +16,10 @@ interface Caso {
 
 interface Detalle {
   id: number; contenido: string; tipo: string; creado_por_nombre: string; created_at: string;
+}
+
+interface Recurso {
+  id: number; nombre: string; serial: string; tipo: string; marca: string; modelo: string;
 }
 
 export default function CasoDetalle() {
@@ -31,6 +36,10 @@ export default function CasoDetalle() {
   const [guardando, setGuardando] = useState(false);
   const [confirmarCierre, setConfirmarCierre] = useState(false);
 
+  const [mostrarVinculador, setMostrarVinculador] = useState(false);
+  const [recursosDisponibles, setRecursosDisponibles] = useState<Recurso[]>([]);
+  const [busquedaRecurso, setBusquedaRecurso] = useState("");
+
   useEffect(() => {
     Promise.all([
       api.get<Caso>(`/helpdesk/casos/${id}`),
@@ -40,6 +49,50 @@ export default function CasoDetalle() {
       .catch(() => navigate("/helpdesk/casos"))
       .finally(() => setCargando(false));
   }, [id, api, navigate]);
+
+  async function abrirVinculador() {
+    setMostrarVinculador(true);
+    setBusquedaRecurso("");
+    try {
+      const res = await api.get<Recurso[]>(`/helpdesk/recursos?cliente_id=${caso?.cliente_id || 0}`);
+      const vinculados = new Set(caso?.recursos?.map((r) => r.id) || []);
+      setRecursosDisponibles(res.filter((r) => !vinculados.has(r.id)));
+    } catch {
+      setRecursosDisponibles([]);
+    }
+  }
+
+  async function vincularRecurso(recursoId: number) {
+    setGuardando(true);
+    try {
+      await api.post(`/helpdesk/casos/${id}/recursos`, { recurso_ids: [recursoId] });
+      const updated = await api.get<Caso>(`/helpdesk/casos/${id}`);
+      setCaso(updated);
+      setRecursosDisponibles((prev) => prev.filter((r) => r.id !== recursoId));
+    } catch (e: any) {
+      alert(e.message || "Error al vincular recurso");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function desvincularRecurso(recursoId: number) {
+    if (!confirm("¿Desvincular este recurso del caso?")) return;
+    setGuardando(true);
+    try {
+      await api.del(`/helpdesk/casos/${id}/recursos/${recursoId}`);
+      const updated = await api.get<Caso>(`/helpdesk/casos/${id}`);
+      setCaso(updated);
+      setRecursosDisponibles((prev) => {
+        const found = updated.recursos?.find((r: any) => r.id === recursoId);
+        return found ? [...prev, found] : prev;
+      });
+    } catch (e: any) {
+      alert(e.message || "Error al desvincular recurso");
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   async function agregarDetalle() {
     if (!nuevoDetalle.trim()) return;
@@ -94,6 +147,8 @@ export default function CasoDetalle() {
   if (cargando) return <p className="text-center py-12 text-gray-400">Cargando caso...</p>;
   if (!caso) return <p className="text-center py-12 text-gray-400">Caso no encontrado</p>;
 
+  const recursos = caso.recursos || [];
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <button onClick={() => navigate("/helpdesk/casos")} className="text-sm text-gray-400 hover:text-gray-600">← Volver a casos</button>
@@ -121,9 +176,34 @@ export default function CasoDetalle() {
           {caso.cliente_nombre && (
             <div><span className="text-gray-400 text-xs block">Cliente</span><span className="font-medium">{caso.cliente_nombre}</span></div>
           )}
-          {caso.recurso_nombre && (
-            <div><span className="text-gray-400 text-xs block">Recurso</span><span className="font-medium">{caso.recurso_nombre} {caso.recurso_serial && `(${caso.recurso_serial})`}</span></div>
-          )}
+          <div>
+            <span className="text-gray-400 text-xs block">Recursos</span>
+            {recursos.length === 0 ? (
+              <span className="text-gray-400">Ninguno</span>
+            ) : (
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {recursos.map((r) => (
+                  <span key={r.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
+                    {r.nombre}
+                    {r.serial && <span className="text-gray-400 font-mono">({r.serial})</span>}
+                    {puedeGestionar && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); desvincularRecurso(r.id); }}
+                        className="hover:text-red-500 ml-0.5"
+                        title="Desvincular"
+                      >✕</button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+            {puedeGestionar && (
+              <button type="button" onClick={abrirVinculador} className="text-xs text-amber-600 hover:text-amber-800 mt-1">
+                + Vincular recurso
+              </button>
+            )}
+          </div>
           {caso.tecnico_nombre && (
             <div><span className="text-gray-400 text-xs block">Técnico</span><span className="font-medium">{caso.tecnico_nombre}</span></div>
           )}
@@ -131,6 +211,32 @@ export default function CasoDetalle() {
             <div><span className="text-gray-400 text-xs block">Contacto</span><span className="font-medium">{caso.contacto_nombre}</span></div>
           )}
         </div>
+
+        {mostrarVinculador && (
+          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Vincular recurso existente</span>
+              <button type="button" onClick={() => setMostrarVinculador(false)} className="text-xs text-gray-400 hover:text-gray-600">Cerrar</button>
+            </div>
+            <input type="text" value={busquedaRecurso} onChange={(e) => setBusquedaRecurso(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg mb-2" placeholder="Buscar recurso..." autoFocus />
+            {recursosDisponibles.length === 0 ? (
+              <p className="text-sm text-gray-400">No hay más recursos disponibles para este cliente</p>
+            ) : (
+              <div className="max-h-40 overflow-y-auto space-y-1">
+                {recursosDisponibles
+                  .filter((r) => !busquedaRecurso || r.nombre.toLowerCase().includes(busquedaRecurso.toLowerCase()) || r.serial?.toLowerCase().includes(busquedaRecurso.toLowerCase()))
+                  .map((r) => (
+                    <button key={r.id} type="button" onClick={() => vincularRecurso(r.id)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-white rounded border border-transparent hover:border-gray-200 flex items-center justify-between">
+                      <span><span className="font-medium">{r.nombre}</span> {r.serial && <span className="text-gray-400 font-mono">({r.serial})</span>}</span>
+                      <span className="text-xs text-gray-400">{r.tipo}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {caso.estado !== "Completado" && caso.estado !== "Cancelado" && puedeGestionar && (
           <div className="mt-6 pt-4 border-t flex gap-3">

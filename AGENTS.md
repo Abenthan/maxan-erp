@@ -75,7 +75,7 @@
 - `pages/NuevoPago.tsx` — `/cartera/nuevo-pago` Página dedicada paso a paso (cliente → facturas → confirmar)
 - `pages/Retenciones.tsx` — `/cartera/retenciones` Listado de retenciones realizadas con total acumulado
 - `pages/NuevaVenta.tsx` — `/nueva-venta` y `/nueva-venta/:id` (edición). Cliente default "Ventas sin factura" con CC 123456789. Campo Observaciones con auto-focus. Items con dos columnas: Código (input, al perder foco busca producto por código exacto) y Producto (autocomplete por código/nombre). Si el producto es inventariable, al crear consume inventario. En modo edición carga datos vía GET y guarda con PUT.
-- `context/ApiContext.tsx` — Métodos: `get`, `post`, `put`, `del`, `postXml`, `upload`
+- `context/ApiContext.tsx` — Métodos: `get`, `post`, `put`, `patch`, `del`, `postXml`, `upload`
 - `context/AuthContext.tsx` — Provider con `user`, `token`, `login()`, `logout()`, `hasPermiso()`. Hook `usePermiso(codigo)` y `useAuth()`. Detecta `isFirstRun` automáticamente.
 
 ## Autenticación y permisos
@@ -143,7 +143,7 @@
 ## Schemas SQL
 - `db/01_schema.sql` — Schema `facturacion` (aplicado)
 - `db/02_compras_gastos_inventario.sql` — Schemas `compras`, `inventario`, `gastos` con tablas, triggers, vistas (`vw_stock_disponible`, `vw_utilidad_items`, `vw_utilidad_productos`) — **YA aplicado**
-- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`, `10_cufe_nullable.sql`, `11_retenciones_ventas_items.sql`, `12_observaciones_ventas.sql`, `13_secuencia_ventas_manual.sql`, `14_vw_facturas_resumen_observaciones.sql`, `15_modulo_usuarios.sql`, `16_helpdesk_schema.sql`, `17_helpdesk_atributos.sql`, `18_helpdesk_casos.sql`, `19_tipo_tercero.sql`, `20_tipos_recurso.sql`
+- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`, `10_cufe_nullable.sql`, `11_retenciones_ventas_items.sql`, `12_observaciones_ventas.sql`, `13_secuencia_ventas_manual.sql`, `14_vw_facturas_resumen_observaciones.sql`, `15_modulo_usuarios.sql`, `16_helpdesk_schema.sql`, `17_helpdesk_atributos.sql`, `18_helpdesk_casos.sql`, `19_tipo_tercero.sql`, `20_tipos_recurso.sql`, `21_casos_recursos.sql`
 
 ## Dependencias adicionales
 ### Backend

@@ -42,6 +42,17 @@ interface Mantenimiento {
   costo_total: number;
 }
 
+interface Caso {
+  id: number;
+  numero: string;
+  titulo: string;
+  estado: string;
+  categoria_nombre: string;
+  categoria_color: string;
+  tecnico_nombre: string;
+  created_at: string;
+}
+
 export default function RecursoDetalle() {
   const { id } = useParams();
   const api = useApi();
@@ -51,6 +62,7 @@ export default function RecursoDetalle() {
 
   const [recurso, setRecurso] = useState<Recurso | null>(null);
   const [mantenimientos, setMantenimientos] = useState<Mantenimiento[]>([]);
+  const [casos, setCasos] = useState<Caso[]>([]);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [clientes, setClientes] = useState<Tercero[]>([]);
@@ -142,6 +154,7 @@ export default function RecursoDetalle() {
   useEffect(() => {
     api.get<Recurso>(`/helpdesk/recursos/${id}`).then(setRecurso);
     api.get<Mantenimiento[]>(`/helpdesk/mantenimientos?recurso_id=${id}`).then(setMantenimientos);
+    api.get<Caso[]>(`/helpdesk/casos?recurso_id=${id}`).then(setCasos).catch(() => {});
   }, [api, id]);
 
   if (!recurso) return <div className="text-gray-400 p-8">Cargando...</div>;
@@ -404,6 +417,52 @@ export default function RecursoDetalle() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-bold text-gray-800 mb-4">Casos de Soporte Vinculados</h2>
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium">#</th>
+                <th className="text-left px-4 py-3 font-medium">Título</th>
+                <th className="text-left px-4 py-3 font-medium">Categoría</th>
+                <th className="text-left px-4 py-3 font-medium">Estado</th>
+                <th className="text-left px-4 py-3 font-medium">Técnico</th>
+                <th className="text-left px-4 py-3 font-medium">Fecha</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {casos.length === 0 && (
+                <tr><td colSpan={6} className="text-center py-8 text-gray-400">Sin casos vinculados</td></tr>
+              )}
+              {casos.map((c) => (
+                <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/helpdesk/casos/${c.id}`)}>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{c.numero}</td>
+                  <td className="px-4 py-3 font-medium text-gray-800">{c.titulo}</td>
+                  <td className="px-4 py-3">
+                    {c.categoria_nombre && (
+                      <span className="px-2 py-0.5 rounded text-xs" style={{ backgroundColor: c.categoria_color + '20', color: c.categoria_color }}>
+                        {c.categoria_nombre}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      c.estado === 'Completado' ? 'bg-green-100 text-green-700' :
+                      c.estado === 'En Progreso' ? 'bg-blue-100 text-blue-700' :
+                      c.estado === 'Pendiente' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>{c.estado}</span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">{c.tecnico_nombre || "-"}</td>
+                  <td className="px-4 py-3 text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ interface ApiContextValue {
   get: <T>(url: string, params?: Record<string, string>) => Promise<T>;
   post: <T>(url: string, body?: unknown) => Promise<T>;
   put: <T>(url: string, body?: unknown) => Promise<T>;
+  patch: <T>(url: string, body?: unknown) => Promise<T>;
   del: <T>(url: string) => Promise<T>;
   postXml: <T>(url: string, xml: string) => Promise<T>;
   upload: <T>(url: string, formData: FormData) => Promise<T>;
@@ -26,6 +27,10 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     return api.put<T>(url, body).then((r) => r.data);
   }, []);
 
+  const patch = useCallback(<T,>(url: string, body?: unknown): Promise<T> => {
+    return api.patch<T>(url, body).then((r) => r.data);
+  }, []);
+
   const postXml = useCallback(<T,>(url: string, xml: string): Promise<T> => {
     return api.post<T>(url, xml, {
       headers: { "Content-Type": "text/xml" },
@@ -43,7 +48,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ApiContext.Provider value={{ get, post, put, del, postXml, upload }}>
+    <ApiContext.Provider value={{ get, post, put, patch, del, postXml, upload }}>
       {children}
     </ApiContext.Provider>
   );

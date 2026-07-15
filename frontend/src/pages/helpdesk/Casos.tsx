@@ -4,6 +4,13 @@ import { useApi } from "../../context/ApiContext";
 import { usePermiso } from "../../context/AuthContext";
 import { useHelpdesk } from "../../context/HelpdeskContext";
 
+interface RecursoInfo {
+  id: number;
+  nombre: string;
+  serial: string;
+  tipo: string;
+}
+
 interface Caso {
   id: number;
   numero: string;
@@ -16,6 +23,7 @@ interface Caso {
   cliente_nombre: string;
   recurso_nombre: string;
   recurso_serial: string;
+  recursos: RecursoInfo[];
   fuente: string;
   created_at: string;
 }
@@ -55,7 +63,7 @@ export default function Casos() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
+    <div className="max-w-6xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Casos de Soporte</h1>
         {puedeGestionar && (
@@ -97,6 +105,7 @@ export default function Casos() {
                 <th className="p-3 font-semibold text-gray-600">#</th>
                 <th className="p-3 font-semibold text-gray-600">Título</th>
                 <th className="p-3 font-semibold text-gray-600">Cliente</th>
+                <th className="p-3 font-semibold text-gray-600">Recursos</th>
                 <th className="p-3 font-semibold text-gray-600">Categoría</th>
                 <th className="p-3 font-semibold text-gray-600">Técnico</th>
                 <th className="p-3 font-semibold text-gray-600">Estado</th>
@@ -105,28 +114,47 @@ export default function Casos() {
               </tr>
             </thead>
             <tbody>
-              {casos.map((c) => (
-                <tr key={c.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/helpdesk/casos/${c.id}`)}>
-                  <td className="p-3 font-mono text-xs text-gray-500">{c.numero}</td>
-                  <td className="p-3 font-medium">{c.titulo}</td>
-                  <td className="p-3 text-gray-600">{c.cliente_nombre || "-"}</td>
-                  <td className="p-3">
-                    {c.categoria_nombre && (
-                      <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: c.categoria_color + '20', color: c.categoria_color }}>
-                        {c.categoria_nombre}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-gray-600">{c.tecnico_nombre || "-"}</td>
-                  <td className="p-3">
-                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${badgeColor(c.estado)}`}>{c.estado}</span>
-                  </td>
-                  <td className="p-3 text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString()}</td>
-                  <td className="p-3 text-right">
-                    <span className="text-amber-500">→</span>
-                  </td>
-                </tr>
-              ))}
+              {casos.map((c) => {
+                const res = c.recursos || [];
+                return (
+                  <tr key={c.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/helpdesk/casos/${c.id}`)}>
+                    <td className="p-3 font-mono text-xs text-gray-500">{c.numero}</td>
+                    <td className="p-3 font-medium">{c.titulo}</td>
+                    <td className="p-3 text-gray-600">{c.cliente_nombre || "-"}</td>
+                    <td className="p-3">
+                      {res.length === 0 ? (
+                        <span className="text-gray-400">-</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {res.slice(0, 2).map((r) => (
+                            <span key={r.id} className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
+                              {r.nombre}
+                            </span>
+                          ))}
+                          {res.length > 2 && (
+                            <span className="text-xs text-gray-400">+{res.length - 2}</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {c.categoria_nombre && (
+                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: c.categoria_color + '20', color: c.categoria_color }}>
+                          {c.categoria_nombre}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-gray-600">{c.tecnico_nombre || "-"}</td>
+                    <td className="p-3">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${badgeColor(c.estado)}`}>{c.estado}</span>
+                    </td>
+                    <td className="p-3 text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString()}</td>
+                    <td className="p-3 text-right">
+                      <span className="text-amber-500">→</span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
