@@ -184,6 +184,8 @@
 26. **Auto-guardado de PC sin revisión** → el script guardaba automáticamente en BD si recibía `cliente_id`. Se cambió a flujo de dos pasos: los datos se almacenan temporalmente en memoria (`Map` en el controller), el técnico los revisa en pantalla y decide si guardar.
 27. **RecursoDetalle sin edición** → no había forma de editar un recurso helpdesk. Se agregó modo edición inline con formulario completo (campos fijos + `atributos` JSONB: tipo_almacenamiento, chip_video, memoria_video_mb). Guarda vía `PUT /api/helpdesk/recursos/:id`.
 28. **pg_dump no disponible en host** → la BD está en Docker, `pg_dump` no está en Windows. Solución: el endpoint `GET /api/backup/descargar` ejecuta `docker exec -i maxan_db_dev pg_dump ...` en lugar de llamar a pg_dump directamente. Configurable via `DB_USE_DOCKER=false` en `.env` para entornos con pg_dump nativo.
+29. **Varios recursos por caso helpdesk** — se agregó tabla pivote `helpdesk.casos_recursos` (M2M entre casos y recursos). Migración `21_casos_recursos.sql`. Backend con 3 nuevos endpoints (GET/POST/DELETE). Frontend: multiselect en CasoNuevo, chips + vincular/desvincular en CasoDetalle, columna en Casos, sección inversa en RecursoDetalle.
+30. **ApiContext sin método patch** — `CasoDetalle.tsx` usaba `api.patch` que no existía en el context. Se agregó `patch` a la interfaz, implementación y value del provider.
 
 ## Cálculo de utilidad (`vw_utilidad_productos`)
 - **costo_adquisiciones** = SUM(entradas.cantidad × costo_unitario) — todo lo que entró a inventario (gastos Suministros que generan entrada via trigger)
@@ -322,10 +324,13 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/api/helpdesk/mantenimientos/:id` | GET/PUT | `helpdesk.ver`/`.gestionar` | CRUD mantenimientos |
 | `/api/helpdesk/detalles/:mantenimiento_id` | GET/POST | `helpdesk.ver`/`.gestionar` | Bitácora de mantenimiento |
 | `/api/helpdesk/categorias-mantenimiento` | GET | `helpdesk.ver` | Listar categorías |
-| `/api/helpdesk/casos` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | CRUD casos de soporte |
-| `/api/helpdesk/casos/:id` | GET/PUT | `helpdesk.casos.ver`/`.gestionar` | Obtener/editar caso |
+| `/api/helpdesk/casos` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | CRUD casos de soporte (POST acepta `recurso_ids[]`) |
+| `/api/helpdesk/casos/:id` | GET/PUT | `helpdesk.casos.ver`/`.gestionar` | Obtener/editar caso (PUT acepta `recurso_ids[]` para reemplazar vínculos) |
 | `/api/helpdesk/casos/:id/estado` | PATCH | `helpdesk.casos.gestionar` | Cambiar estado + registrar solución |
 | `/api/helpdesk/casos/:id/detalles` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | Bitácora del caso |
+| `/api/helpdesk/casos/:id/recursos` | GET | `helpdesk.casos.ver` | Listar recursos vinculados al caso |
+| `/api/helpdesk/casos/:id/recursos` | POST | `helpdesk.casos.gestionar` | Vincular recurso(s) al caso (`{ recurso_ids: [1,2] }`) |
+| `/api/helpdesk/casos/:id/recursos/:recurso_id` | DELETE | `helpdesk.casos.gestionar` | Desvincular recurso del caso |
 | `/api/helpdesk/contactos` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | CRUD contactos de clientes |
 | `/api/helpdesk/contactos/:id` | GET/PUT/DELETE | `helpdesk.casos.ver`/`.gestionar` | CRUD contacto individual |
 | `/api/helpdesk/categorias-caso` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | Categorías editables de caso |
@@ -340,12 +345,12 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/helpdesk` | `Clientes.tsx` | `helpdesk.ver` | Seleccionar cliente para trabajar |
 | `/helpdesk/clientes/:id` | `ClienteDetalle.tsx` | `helpdesk.ver` | Recursos del cliente |
 | `/helpdesk/recursos` | `Recursos.tsx` | `helpdesk.ver` | Listado de recursos con columnas: Nombre, Cliente, Tipo, Marca, Modelo, Serial, Estado (Activo/Inactivo), Observaciones. Botones + Nuevo y + Detectar PC. |
-| `/helpdesk/recursos/:id` | `RecursoDetalle.tsx` | `helpdesk.ver` | Detalle del equipo + historial de mantenimientos. Modo edición con campos fijos y `atributos` (tipo disco, chip video, VRAM). Botón Eliminar solo para admins (`usuarios.gestionar`). |
+| `/helpdesk/recursos/:id` | `RecursoDetalle.tsx` | `helpdesk.ver` | Detalle del equipo + historial de mantenimientos + **casos de soporte vinculados**. Modo edición con campos fijos y `atributos` (tipo disco, chip video, VRAM). Botón Eliminar solo para admins (`usuarios.gestionar`). |
 | `/helpdesk/nuevo-recurso` | `NuevoRecurso.tsx` | `helpdesk.gestionar` | Formulario completo para crear cualquier tipo de recurso. Select tipo desde API + ⚙ para administrar tipos. |
 | `/helpdesk/obtener-pc` | `RegistrarPC.tsx` | `helpdesk.gestionar` | Detectar PC: script PS + formulario manual. Cliente desde contexto (no dropdown). |
-| `/helpdesk/casos` | `Casos.tsx` | `helpdesk.casos.ver` | Listado de casos con filtros (búsqueda, estado), tabla con #, título, cliente, categoría, técnico, estado. |
-| `/helpdesk/casos/nuevo` | `CasoNuevo.tsx` | `helpdesk.casos.gestionar` | Formulario crear caso: título, descripción, categoría, técnico, cliente con búsqueda. |
-| `/helpdesk/casos/:id` | `CasoDetalle.tsx` | `helpdesk.casos.ver` | Detalle del caso con bitácora, cambio de estado (Iniciar/Completar/Cancelar), campo de solución al cerrar. |
+| `/helpdesk/casos` | `Casos.tsx` | `helpdesk.casos.ver` | Listado de casos con filtros (búsqueda, estado), tabla con #, título, cliente, **recursos**, categoría, técnico, estado. |
+| `/helpdesk/casos/nuevo` | `CasoNuevo.tsx` | `helpdesk.casos.gestionar` | Formulario crear caso: título, descripción, categoría, técnico, cliente con búsqueda, **recursos multiselect** filtrado por cliente. |
+| `/helpdesk/casos/:id` | `CasoDetalle.tsx` | `helpdesk.casos.ver` | Detalle del caso con **recursos vinculados (chips + desvincular)**, bitácora, cambio de estado (Iniciar/Completar/Cancelar), campo de solución al cerrar. Botón "+ Vincular recurso" con selector. |
 | `/helpdesk/categorias-caso` | `CategoriasCaso.tsx` | `helpdesk.casos.gestionar` | Administrar categorías (agregar/eliminar con selector de color). |
 
 ### Permisos (seed automático)

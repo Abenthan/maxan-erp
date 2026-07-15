@@ -40,6 +40,28 @@ Sistema de facturación electrónica colombiano para DIAN (UBL 2.1).
 | `GET` | `/api/helpdesk/detalles/:mid` | `helpdesk.ver` | Obtener detalles/bitácora de mantenimiento |
 | `POST` | `/api/helpdesk/detalles/:mid` | `helpdesk.gestionar` | Agregar detalle a mantenimiento |
 | `GET` | `/api/helpdesk/categorias-mantenimiento` | `helpdesk.ver` | Listar categorías de mantenimiento |
+| `GET` | `/api/helpdesk/casos` | `helpdesk.casos.ver` | Listar casos de soporte |
+| `POST` | `/api/helpdesk/casos` | `helpdesk.casos.gestionar` | Crear caso (acepta `recurso_ids[]`) |
+| `GET` | `/api/helpdesk/casos/:id` | `helpdesk.casos.ver` | Obtener caso con recursos vinculados |
+| `PUT` | `/api/helpdesk/casos/:id` | `helpdesk.casos.gestionar` | Actualizar caso (acepta `recurso_ids[]`) |
+| `PATCH` | `/api/helpdesk/casos/:id/estado` | `helpdesk.casos.gestionar` | Cambiar estado + solución |
+| `GET` | `/api/helpdesk/casos/:id/detalles` | `helpdesk.casos.ver` | Bitácora del caso |
+| `POST` | `/api/helpdesk/casos/:id/detalles` | `helpdesk.casos.gestionar` | Agregar entrada a bitácora |
+| `GET` | `/api/helpdesk/casos/:id/recursos` | `helpdesk.casos.ver` | Listar recursos vinculados al caso |
+| `POST` | `/api/helpdesk/casos/:id/recursos` | `helpdesk.casos.gestionar` | Vincular recurso(s) al caso |
+| `DELETE` | `/api/helpdesk/casos/:id/recursos/:rid` | `helpdesk.casos.gestionar` | Desvincular recurso del caso |
+| `GET` | `/api/helpdesk/contactos` | `helpdesk.casos.ver` | Listar contactos de clientes |
+| `POST` | `/api/helpdesk/contactos` | `helpdesk.casos.gestionar` | Crear contacto |
+| `GET` | `/api/helpdesk/contactos/:id` | `helpdesk.casos.ver` | Obtener contacto |
+| `PUT` | `/api/helpdesk/contactos/:id` | `helpdesk.casos.gestionar` | Actualizar contacto |
+| `DELETE` | `/api/helpdesk/contactos/:id` | `helpdesk.casos.gestionar` | Eliminar contacto |
+| `GET` | `/api/helpdesk/categorias-caso` | `helpdesk.casos.ver` | Listar categorías de caso |
+| `POST` | `/api/helpdesk/categorias-caso` | `helpdesk.casos.gestionar` | Crear categoría de caso |
+| `PUT` | `/api/helpdesk/categorias-caso/:id` | `helpdesk.casos.gestionar` | Editar categoría de caso |
+| `DELETE` | `/api/helpdesk/categorias-caso/:id` | `helpdesk.casos.gestionar` | Eliminar categoría de caso |
+| `GET` | `/api/helpdesk/tipos-recurso` | `helpdesk.ver` | Listar tipos de recurso |
+| `POST` | `/api/helpdesk/tipos-recurso` | `helpdesk.gestionar` | Crear tipo de recurso |
+| `DELETE` | `/api/helpdesk/tipos-recurso/:id` | `helpdesk.gestionar` | Eliminar tipo de recurso |
 
 ## Desarrollo
 
@@ -81,6 +103,10 @@ npm run dev
 | `/helpdesk/clientes/:id` | Recursos del cliente |
 | `/helpdesk/recursos/:id` | Detalle del equipo + modo edición inline |
 | `/helpdesk/obtener-pc` | Detectar PC remoto via script PowerShell |
+| `/helpdesk/casos` | Listado de casos de soporte con filtros |
+| `/helpdesk/casos/nuevo` | Crear caso con recursos multiselect |
+| `/helpdesk/casos/:id` | Detalle del caso con recursos vinculados y bitácora |
+| `/helpdesk/categorias-caso` | Administrar categorías de caso |
 | `/login` | Inicio de sesión |
 | `/register` | Registro primer usuario (solo si no hay usuarios) |
 | `/usuarios` | Gestionar usuarios (solo admin) |
@@ -110,7 +136,10 @@ maxan-erp/
 │   │   │   └── helpdesk/
 │   │   │       ├── recursosController.js      # CRUD recursos + detectar PC
 │   │   │       ├── mantenimientosController.js
-│   │   │       └── detallesController.js
+│   │   │       ├── detallesController.js
+│   │   │       ├── casosController.js         # CRUD casos + M2M recursos
+│   │   │       ├── contactosController.js
+│   │   │       └── categoriasCasoController.js
 │   │   ├── routes/
 │   │   │   ├── facturas.js
 │   │   │   ├── terceros.js
@@ -127,7 +156,10 @@ maxan-erp/
 │   │   │   └── helpdesk/
 │   │   │       ├── recursos.js               # Rutas recursos + detectar PC
 │   │   │       ├── mantenimientos.js
-│   │   │       └── detalles.js
+│   │   │       ├── detalles.js
+│   │   │       ├── casos.js                  # Rutas casos + M2M recursos
+│   │   │       ├── contactos.js
+│   │   │       └── categoriasCaso.js
 │   │   └── services/
 │   │       └── xmlParser.js            # Parser XML DIAN UBL 2.1
 │   ├── index.js
@@ -163,20 +195,26 @@ maxan-erp/
 │   │   │   └── helpdesk/
 │   │   │       ├── Clientes.tsx
 │   │   │       ├── ClienteDetalle.tsx
-│   │   │       ├── RecursoDetalle.tsx   # Detalle + edición inline
+│   │   │       ├── Casos.tsx            # Listado de casos con columna recursos
+│   │   │       ├── CasoNuevo.tsx        # Crear caso con selector multiselect recursos
+│   │   │       ├── CasoDetalle.tsx      # Detalle caso + chips recursos + bitácora
+│   │   │       ├── CategoriasCaso.tsx   # Administrar categorías de caso
+│   │   │       ├── RecursoDetalle.tsx   # Detalle + edición inline + casos vinculados
 │   │   │       └── RegistrarPC.tsx     # Detectar PC (script + revisar + manual)
 │   │   ├── components/
 │   │   │   ├── ProtectedRoute.tsx      # Ruta protegida por auth/permiso
 │   │   │   └── HelpdeskLayout.tsx
 │   │   ├── context/
-│   │   │   ├── ApiContext.tsx          # API methods (get, post, put, del, upload)
-│   │   │   └── AuthContext.tsx         # Auth provider + JWT + permisos
+│   │   │   ├── ApiContext.tsx          # API methods (get, post, put, patch, del, upload)
+│   │   │   ├── AuthContext.tsx         # Auth provider + JWT + permisos
+│   │   │   └── HelpdeskContext.tsx     # Cliente seleccionado para helpdesk
 │   ├── index.html
 │   └── vite.config.ts
 ├── db/
 │   ├── 01_schema.sql
 │   ├── 02_compras_gastos_inventario.sql
-│   ├── ...                             # Migraciones 03-16
+│   ├── ...                             # Migraciones 03-20
+│   ├── 21_casos_recursos.sql           # M2M casos ↔ recursos
 │   └── init/01_schema.sql
 └── docker-compose.dev.yml
 ```
