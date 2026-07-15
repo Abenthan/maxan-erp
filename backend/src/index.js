@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const compression = require("compression");
 const { Pool } = require("pg");
 const { authenticate } = require("./middleware/auth");
 const { seedPermisos } = require("./seed/permisos");
@@ -41,11 +43,16 @@ const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  max: Number(process.env.DB_POOL_MAX) || 20,
+  idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT) || 30000,
+  connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT) || 5000,
 });
 
 app.locals.pool = pool;
 
-app.use(cors());
+app.use(helmet());
+app.use(compression());
+app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
 app.use(express.text({ type: ["text/xml", "application/xml", "text/plain"] }));
 app.use(express.json({ type: "application/json" }));
 
@@ -95,8 +102,13 @@ app.get("/health", async (req, res) => {
 
 app.use((err, req, res, next) => {
   console.error("Error no manejado:", err);
-  res.status(500).json({ error: err.message || "Error interno del servidor" });
+  const message = process.env.NODE_ENV === "production"
+    ? "Error interno del servidor"
+    : err.message || "Error interno del servidor";
+  res.status(err.status || 500).json({ error: message });
 });
+
+let server;
 
 async function start() {
   try {
@@ -108,9 +120,26 @@ async function start() {
     }
   }
 
-  app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     console.log(`Servidor backend escuchando en el puerto ${PORT}`);
   });
 }
+
+function gracefulShutdown(signal) {
+  console.log(`\n${signal} recibido. Cerrando servidor...`);
+  server?.close(() => {
+    pool.end().then(() => {
+      console.log("Pool de BD cerrado. Servidor detenido.");
+      process.exit(0);
+    });
+  });
+  setTimeout(() => {
+    console.error("Forzando cierre después de timeout");
+    process.exit(1);
+  }, 10000);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 start();
