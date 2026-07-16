@@ -187,8 +187,11 @@
 29. **Varios recursos por caso helpdesk** — se agregó tabla pivote `helpdesk.casos_recursos` (M2M entre casos y recursos). Migración `21_casos_recursos.sql`. Backend con 3 nuevos endpoints (GET/POST/DELETE). Frontend: multiselect en CasoNuevo, chips + vincular/desvincular en CasoDetalle, columna en Casos, sección inversa en RecursoDetalle.
 30. **ApiContext sin método patch** — `CasoDetalle.tsx` usaba `api.patch` que no existía en el context. Se agregó `patch` a la interfaz, implementación y value del provider.
 31. **Configuración sin HelpdeskProvider** — `ConfiguracionRoutes` en `App.tsx` usaba `<HelpdeskLayout>` sin estar envuelta en `<HelpdeskProvider>`, causando error `useHelpdesk debe usarse dentro de HelpdeskProvider`. Solución: agregar `<HelpdeskProvider>` en la ruta `/configuracion/*`.
-32. **Backup cambiado a full SQL script** — `GET /api/backup/descargar` cambió de `-Fc` (formato binario `.dump`) a `--clean --if-exists --column-inserts` (SQL plano `.sql` con DROP+CREATE+INSERT), generando un dump completo (schema + data) ejecutable directamente en DBeaver para migración/replicación entre entornos.
+32. **Backup cambiado a full SQL script** — `GET /api/backup/descargar` cambió de `-Fc` (formato binario `.dump`) a `--column-inserts` (SQL plano `.sql`) con `DROP SCHEMA ... CASCADE` prependido manualmente (en lugar de `--clean` que causaba conflictos de dependencias). Genera dump completo (schema + data) ejecutable directamente en DBeaver.
 33. **Puerto BD cambiado a 5433** — `docker-compose.dev.yml` cambió de `5432:5432` a `5433:5432` para evitar conflicto con `maxanbotdb` en el servidor. `backend/.env` actualizado con `DB_PORT=5433`.
+34. **`\restrict` y `\unrestrict` de pg_dump 16** — pg_dump 16 agrega meta-comandos psql `\restrict`/`\unrestrict` que no son SQL válido y causaban syntax error en DBeaver. Solución: filtro stream que remueve líneas que empiezan con `\restrict` o `\unrestrict`.
+35. **POST /api/auth/seed-admin** — endpoint para crear admin inicial en producción (alternativa a `/register`). Crea empresa + usuario admin + asigna rol Administrador. Útil cuando el flujo first-run no está disponible.
+36. **Backend .env DB_PORT corregido** — `backend/.env` tenía `DB_PORT=5433` pero el contenedor PostgreSQL en desarrollo usaba `5432:5432` (no el `5433:5432` del compose). Corregido a `DB_PORT=5432`.
 
 ## Cálculo de utilidad (`vw_utilidad_productos`)
 - **costo_adquisiciones** = SUM(entradas.cantidad × costo_unitario) — todo lo que entró a inventario (gastos Suministros que generan entrada via trigger)
