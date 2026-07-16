@@ -34,7 +34,7 @@ export default function Backup() {
       a.href = url;
       const disposition = response.headers.get("Content-Disposition");
       const match = disposition?.match(/filename="?(.+?)"?$/);
-      a.download = match?.[1] || `maxan_backup_${new Date().toISOString().replace(/[:.]/g, "-")}.dump`;
+      a.download = match?.[1] || `maxan_backup_${new Date().toISOString().replace(/[:.]/g, "-")}.sql`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -56,12 +56,13 @@ export default function Backup() {
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-lg">
         <p className="text-sm text-gray-600 mb-4">
-          Descarga una copia de seguridad completa de la base de datos en formato comprimido (.dump).
-          Este archivo puede ser restaurado posteriormente con pg_restore.
+          Descarga una copia de seguridad completa de la base de datos en formato SQL (.sql).
+          Este archivo puede ejecutarse directamente como script en DBeaver, DataGrip o la herramienta
+          de base de datos de tu preferencia para migrar los datos a otro entorno.
         </p>
 
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4 text-sm text-amber-800">
-          <strong>Importante:</strong> Durante la generación del backup, el rendimiento del sistema podr&iacute;a verse afectado.
+          <strong>Importante:</strong> Durante la generación del backup, el rendimiento del sistema podría verse afectado.
         </div>
 
         {status && (

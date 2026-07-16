@@ -12,7 +12,7 @@ const USE_DOCKER = process.env.DB_USE_DOCKER !== "false";
 function buildPgDumpArgs() {
   const dbUser = process.env.DB_USER || "maxan_user";
   const dbName = process.env.DB_NAME || "maxan_erp";
-  return ["-U", dbUser, "-Fc", "--no-owner", "--no-acl", dbName];
+  return ["-U", dbUser, "--column-inserts", "--no-owner", "--no-acl", dbName];
 }
 
 function spawnPgDump() {
@@ -35,9 +35,9 @@ function spawnPgDump() {
 
 router.get("/descargar", (req, res) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `maxan_backup_${timestamp}.dump`;
+  const filename = `maxan_backup_${timestamp}.sql`;
 
-  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Content-Type", "application/sql; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
   const proc = spawnPgDump();

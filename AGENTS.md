@@ -57,7 +57,7 @@
 - **Dashboard** — `routes/dashboard.js` → `GET /api/dashboard` con filtros `?mes=&cliente_id=&factura_id=`
   - Retorna: resumen, ventas_por_mes, gastos_por_mes, gastos_por_clasificacion, top_clientes, ultimas_facturas, clientes, productos_utilidad
 - **Cartera/Pagos** — `routes/cartera.js` → `GET /api/cartera/activa` (aging A/R), `POST/GET /api/cartera/pagos` (crear/listar), `GET /api/cartera/pagos/:id` (detalle), `PUT /api/cartera/pagos/:id` (editar fecha/medio/referencia/observaciones), `POST /api/cartera/pagos/:id/anular`, `GET /api/cartera/clientes-deuda` (clientes con saldo), `GET /api/cartera/clientes-deuda/:id/facturas` (facturas pendientes), `GET/POST /api/cartera/medios-pago`, `GET /api/cartera/retenciones` (listado de retenciones realizadas)
-- **Backup** — `routes/backup.js` → `GET /api/backup/descargar` (stream pg_dump -Fc via Docker), `GET /api/backup/verificar` (comprueba disponibilidad). Protegido con `usuarios.gestionar`.
+- **Backup** — `routes/backup.js` → `GET /api/backup/descargar` (stream pg_dump con `--column-inserts` via Docker, genera `.sql` ejecutable en DBeaver), `GET /api/backup/verificar` (comprueba disponibilidad). Protegido con `usuarios.gestionar`.
 
 ## Frontend módulos (implementados)
 - `pages/Dashboard.tsx` — Página principal `/` con cards de resumen, barras ventas/gastos/clasificación, top clientes, últimas facturas, utilidad por producto. Filtros: mes (select últimos 12 meses), cliente, factura ID.
@@ -118,7 +118,7 @@
 - `pages/Register.tsx` — `/register` Registro primer usuario (crea empresa + admin). Solo accesible si no hay usuarios.
 - `pages/Usuarios.tsx` — `/usuarios` CRUD usuarios con asignación de roles. Solo admin.
 - `pages/Roles.tsx` — `/roles` CRUD roles con asignación de permisos por módulo. Solo admin.
-- `pages/Backup.tsx` — `/configuracion/backup` Descargar copia de seguridad de la BD. Botón que genera y descarga archivo .dump via `pg_dump -Fc` dentro del contenedor Docker. Verifica disponibilidad de pg_dump al cargar.
+- `pages/Backup.tsx` — `/configuracion/backup` Descargar copia de seguridad de la BD en formato SQL (.sql) con INSERTs, ejecutable directamente en DBeaver. Verifica disponibilidad de pg_dump al cargar.
 - `components/ProtectedRoute.tsx` — Wrapper de rutas. Redirige a `/login` si no autenticado. Acepta `permiso` opcional.
 
 ### Frontend — ocultación condicional por permisos
@@ -186,6 +186,9 @@
 28. **pg_dump no disponible en host** → la BD está en Docker, `pg_dump` no está en Windows. Solución: el endpoint `GET /api/backup/descargar` ejecuta `docker exec -i maxan_db_dev pg_dump ...` en lugar de llamar a pg_dump directamente. Configurable via `DB_USE_DOCKER=false` en `.env` para entornos con pg_dump nativo.
 29. **Varios recursos por caso helpdesk** — se agregó tabla pivote `helpdesk.casos_recursos` (M2M entre casos y recursos). Migración `21_casos_recursos.sql`. Backend con 3 nuevos endpoints (GET/POST/DELETE). Frontend: multiselect en CasoNuevo, chips + vincular/desvincular en CasoDetalle, columna en Casos, sección inversa en RecursoDetalle.
 30. **ApiContext sin método patch** — `CasoDetalle.tsx` usaba `api.patch` que no existía en el context. Se agregó `patch` a la interfaz, implementación y value del provider.
+31. **Configuración sin HelpdeskProvider** — `ConfiguracionRoutes` en `App.tsx` usaba `<HelpdeskLayout>` sin estar envuelta en `<HelpdeskProvider>`, causando error `useHelpdesk debe usarse dentro de HelpdeskProvider`. Solución: agregar `<HelpdeskProvider>` en la ruta `/configuracion/*`.
+32. **Backup cambiado a SQL script** — `GET /api/backup/descargar` cambió de `-Fc` (formato binario `.dump`) a `--column-inserts` (SQL plano `.sql`), permitiendo ejecutar el backup directamente en DBeaver para migración entre entornos.
+33. **Puerto BD cambiado a 5433** — `docker-compose.dev.yml` cambió de `5432:5432` a `5433:5432` para evitar conflicto con `maxanbotdb` en el servidor. `backend/.env` actualizado con `DB_PORT=5433`.
 
 ## Cálculo de utilidad (`vw_utilidad_productos`)
 - **costo_adquisiciones** = SUM(entradas.cantidad × costo_unitario) — todo lo que entró a inventario (gastos Suministros que generan entrada via trigger)
@@ -273,19 +276,25 @@ docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp
 # Limpiar BD
 docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp -c "TRUNCATE TABLE facturacion.factura_archivos, facturacion.factura_impuestos, facturacion.factura_respuestas_dian, facturacion.ventas_items, facturacion.ventas, facturacion.terceros, compras.facturas_compra_archivos, compras.facturas_compra, gastos.gastos, inventario.salida_detalle, inventario.salidas, inventario.entradas, inventario.productos, inventario.categorias CASCADE;"
 
-# Backup BD
-curl -H "Authorization: Bearer <token>" http://localhost:3000/api/backup/descargar -o backup.dump
+# Backup BD (SQL script, ejecutable en DBeaver)
+curl -H "Authorization: Bearer <token>" http://localhost:3000/api/backup/descargar -o backup.sql
 
-# Restaurar backup
-docker exec -i maxan_db_dev pg_restore -U maxan_user -d maxan_erp --clean < backup.dump
+# Restaurar backup en producción
+# Abrir backup.sql en DBeaver y ejecutar como script en la BD de producción
+# O desde consola:
+docker exec -i maxan_db_dev psql -U maxan_user -d maxan_erp < backup.sql
 ```
 
-## Conexión BD
-- Host: localhost:5432
+## Conexión BD (desarrollo)
+- Host: localhost:5433 (mapeado desde contenedor maxan_db_dev)
 - User: maxan_user
 - Pass: dev_password_segura
 - DB: maxan_erp
 - Schema: facturacion, compras, inventario, gastos, cartera, public, helpdesk
+
+## Notion
+- Token almacenado en `D:\Desarrollos\maxan-erp\.env` como `NOTION_TOKEN`
+- Usar variable de entorno `$env:NOTION_TOKEN` en scripts
 
 ## Módulo Helpdesk
 

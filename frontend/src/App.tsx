@@ -190,7 +190,7 @@ function App() {
             <Route path="/" element={<ProtectedRoute><Inicio /></ProtectedRoute>} />
             <Route path="/financiero/*" element={<FinancieroRoutes />} />
             <Route path="/helpdesk/*" element={<HelpdeskProvider><HelpdeskRoutes /></HelpdeskProvider>} />
-            <Route path="/configuracion/*" element={<ConfiguracionRoutes />} />
+            <Route path="/configuracion/*" element={<HelpdeskProvider><ConfiguracionRoutes /></HelpdeskProvider>} />
             <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
             <Route path="/nuevo-tercero" element={<ProtectedRoute permiso="terceros.gestionar"><NuevoTercero /></ProtectedRoute>} />
             <Route path="/terceros" element={<HelpdeskProvider><HelpdeskLayout titulo="Clientes" color="bg-blue-600"><ProtectedRoute permiso="terceros.ver"><Terceros /></ProtectedRoute></HelpdeskLayout></HelpdeskProvider>} />
