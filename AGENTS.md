@@ -141,9 +141,9 @@
 - Envío: `Authorization: Bearer <token>` en cada request vía interceptor de axios
 
 ## Schemas SQL
-- `db/01_schema.sql` — Schema `facturacion` (aplicado)
-- `db/02_compras_gastos_inventario.sql` — Schemas `compras`, `inventario`, `gastos` con tablas, triggers, vistas (`vw_stock_disponible`, `vw_utilidad_items`, `vw_utilidad_productos`) — **YA aplicado**
-- Migraciones aplicadas: `03_codigo_producto.sql`, `03_rename_facturas_ventas.sql`, `04_categorias_codigo_producto.sql`, `05_trigger_update_gasto.sql`, `06_trigger_clasificacion.sql`, `07_ventas_producto_utilidad.sql`, `08_cartera_pagos.sql`, `09_clasificaciones_gasto.sql`, `10_cufe_nullable.sql`, `11_retenciones_ventas_items.sql`, `12_observaciones_ventas.sql`, `13_secuencia_ventas_manual.sql`, `14_vw_facturas_resumen_observaciones.sql`, `15_modulo_usuarios.sql`, `16_helpdesk_schema.sql`, `17_helpdesk_atributos.sql`, `18_helpdesk_casos.sql`, `19_tipo_tercero.sql`, `20_tipos_recurso.sql`, `21_casos_recursos.sql`
+- `db/init/01_schema.sql` — Schema consolidado (facturacion, compras, inventario, gastos, cartera, usuarios, helpdesk). Se ejecuta automáticamente al crear el contenedor PostgreSQL por primera vez via `docker-entrypoint-initdb.d`.
+- `db/migrar_produccion.sql` — Script para ejecutar en DBeaver contra una BD de producción que se creó antes de tener el schema consolidado. Crea schemas cartera, usuarios, helpdesk y tablas faltantes.
+- Migraciones individuales en `db/`: `01_schema.sql` a `21_casos_recursos.sql` (histórico, todo consolidado en `db/init/01_schema.sql`)
 
 ## Dependencias adicionales
 ### Backend
