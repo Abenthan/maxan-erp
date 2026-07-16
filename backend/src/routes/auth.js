@@ -1,13 +1,14 @@
 const { Router } = require("express");
 const { authenticate } = require("../middleware/auth");
 const {
-  checkFirstRun, register, login, me, changePassword,
+  checkFirstRun, register, seedAdmin, login, me, changePassword,
 } = require("../controllers/authController");
 
 const router = Router();
 
 router.get("/check-first-run", checkFirstRun);
 router.post("/register", register);
+router.post("/seed-admin", seedAdmin);
 router.post("/login", login);
 router.get("/me", authenticate, me);
 router.post("/change-password", authenticate, changePassword);

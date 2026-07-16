@@ -200,4 +200,56 @@ async function changePassword(req, res) {
   }
 }
 
-module.exports = { checkFirstRun, register, login, me, changePassword };
+async function seedAdmin(req, res) {
+  const pool = getPool(req);
+  try {
+    const existentes = await pool.query("SELECT COUNT(*)::int AS count FROM usuarios.usuarios");
+    if (existentes.rows[0].count > 0) {
+      return res.status(400).json({ error: "Ya existen usuarios en el sistema" });
+    }
+
+    const { empresa_nombre, empresa_nit, username, email, password, nombres, apellidos } = req.body;
+    if (!empresa_nombre || !empresa_nit || !username || !email || !password || !nombres || !apellidos) {
+      return res.status(400).json({ error: "Todos los campos son requeridos" });
+    }
+
+    await pool.query("BEGIN");
+
+    const empresaResult = await pool.query(
+      "INSERT INTO usuarios.empresas (nombre, nit) VALUES ($1, $2) RETURNING id",
+      [empresa_nombre, empresa_nit]
+    );
+    const empresaId = empresaResult.rows[0].id;
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const usuarioResult = await pool.query(
+      `INSERT INTO usuarios.usuarios (empresa_id, username, email, password_hash, nombres, apellidos)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [empresaId, username, email, password_hash, nombres, apellidos]
+    );
+    const usuarioId = usuarioResult.rows[0].id;
+
+    await seedPermisos(pool);
+
+    const rolResult = await pool.query("SELECT id FROM usuarios.roles WHERE nombre = $1", ["Administrador"]);
+    if (rolResult.rows.length > 0) {
+      await pool.query(
+        "INSERT INTO usuarios.usuarios_roles (usuario_id, rol_id) VALUES ($1, $2)",
+        [usuarioId, rolResult.rows[0].id]
+      );
+    }
+
+    await pool.query("COMMIT");
+
+    res.status(201).json({ success: true, message: "Usuario administrador creado exitosamente" });
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    if (error.code === "23505") {
+      const campo = error.constraint?.includes("username") ? "nombre de usuario" : "email";
+      return res.status(409).json({ error: `El ${campo} ya está registrado` });
+    }
+    res.status(500).json({ error: error.message });
+  }
+}
+
+module.exports = { checkFirstRun, register, login, me, changePassword, seedAdmin };
