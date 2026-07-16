@@ -248,6 +248,7 @@ ALTER TABLE gastos.gastos ADD COLUMN IF NOT EXISTS codigo_producto VARCHAR(50);
 
 ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS gastos_clasificacion_check;
 ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS gastos_gastos_clasificacion_check;
+ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS fk_gasto_clasificacion;
 ALTER TABLE gastos.gastos ADD CONSTRAINT fk_gasto_clasificacion
     FOREIGN KEY (clasificacion) REFERENCES gastos.clasificaciones(nombre);
 

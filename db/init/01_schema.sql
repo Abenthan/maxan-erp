@@ -914,6 +914,7 @@ ON CONFLICT (nombre) DO NOTHING;
 
 ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS gastos_clasificacion_check;
 ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS gastos_gastos_clasificacion_check;
+ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS fk_gasto_clasificacion;
 
 ALTER TABLE gastos.gastos
     ADD CONSTRAINT fk_gasto_clasificacion
