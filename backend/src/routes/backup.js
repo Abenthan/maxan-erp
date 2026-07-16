@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const { authenticate, authorize } = require("../middleware/auth");
 const { spawn } = require("child_process");
+const { Transform } = require("stream");
 
 const router = Router();
 
@@ -41,7 +42,25 @@ router.get("/descargar", (req, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
   const proc = spawnPgDump();
-  proc.stdout.pipe(res);
+
+  let buf = "";
+  const filterRestrict = new Transform({
+    transform(chunk, encoding, callback) {
+      buf += chunk.toString();
+      const lines = buf.split("\n");
+      buf = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.startsWith("\\restrict")) this.push(line + "\n");
+      }
+      callback();
+    },
+    flush(callback) {
+      if (buf && !buf.startsWith("\\restrict")) this.push(buf);
+      callback();
+    },
+  });
+
+  proc.stdout.pipe(filterRestrict).pipe(res);
 
   let stderr = "";
   proc.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
