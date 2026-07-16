@@ -55,12 +55,12 @@ router.get("/descargar", (req, res) => {
       const lines = buf.split("\n");
       buf = lines.pop() || "";
       for (const line of lines) {
-        if (!line.startsWith("\\restrict")) this.push(line + "\n");
+        if (!line.startsWith("\\restrict") && !line.startsWith("\\unrestrict")) this.push(line + "\n");
       }
       callback();
     },
     flush(callback) {
-      if (buf && !buf.startsWith("\\restrict")) this.push(buf);
+      if (buf && !buf.startsWith("\\restrict") && !buf.startsWith("\\unrestrict")) this.push(buf);
       callback();
     },
   });
