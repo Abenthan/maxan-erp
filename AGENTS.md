@@ -187,7 +187,7 @@
 29. **Varios recursos por caso helpdesk** — se agregó tabla pivote `helpdesk.casos_recursos` (M2M entre casos y recursos). Migración `21_casos_recursos.sql`. Backend con 3 nuevos endpoints (GET/POST/DELETE). Frontend: multiselect en CasoNuevo, chips + vincular/desvincular en CasoDetalle, columna en Casos, sección inversa en RecursoDetalle.
 30. **ApiContext sin método patch** — `CasoDetalle.tsx` usaba `api.patch` que no existía en el context. Se agregó `patch` a la interfaz, implementación y value del provider.
 31. **Configuración sin HelpdeskProvider** — `ConfiguracionRoutes` en `App.tsx` usaba `<HelpdeskLayout>` sin estar envuelta en `<HelpdeskProvider>`, causando error `useHelpdesk debe usarse dentro de HelpdeskProvider`. Solución: agregar `<HelpdeskProvider>` en la ruta `/configuracion/*`.
-32. **Backup cambiado a SQL script** — `GET /api/backup/descargar` cambió de `-Fc` (formato binario `.dump`) a `--column-inserts` (SQL plano `.sql`), permitiendo ejecutar el backup directamente en DBeaver para migración entre entornos.
+32. **Backup cambiado a full SQL script** — `GET /api/backup/descargar` cambió de `-Fc` (formato binario `.dump`) a `--clean --if-exists --column-inserts` (SQL plano `.sql` con DROP+CREATE+INSERT), generando un dump completo (schema + data) ejecutable directamente en DBeaver para migración/replicación entre entornos.
 33. **Puerto BD cambiado a 5433** — `docker-compose.dev.yml` cambió de `5432:5432` a `5433:5432` para evitar conflicto con `maxanbotdb` en el servidor. `backend/.env` actualizado con `DB_PORT=5433`.
 
 ## Cálculo de utilidad (`vw_utilidad_productos`)
@@ -276,8 +276,13 @@ docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp
 # Limpiar BD
 docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp -c "TRUNCATE TABLE facturacion.factura_archivos, facturacion.factura_impuestos, facturacion.factura_respuestas_dian, facturacion.ventas_items, facturacion.ventas, facturacion.terceros, compras.facturas_compra_archivos, compras.facturas_compra, gastos.gastos, inventario.salida_detalle, inventario.salidas, inventario.entradas, inventario.productos, inventario.categorias CASCADE;"
 
-# Backup BD (SQL script, ejecutable en DBeaver)
+# Backup BD (dump completo: DROP+CREATE+INSERT, ejecutable en DBeaver)
 curl -H "Authorization: Bearer <token>" http://localhost:3000/api/backup/descargar -o backup.sql
+
+# Restaurar backup en producción
+# Abrir backup.sql en DBeaver y ejecutar como script en la BD de producción
+# O desde consola:
+docker exec -i maxan_db_dev psql -U maxan_user -d maxan_erp < backup.sql
 
 # Restaurar backup en producción
 # Abrir backup.sql en DBeaver y ejecutar como script en la BD de producción

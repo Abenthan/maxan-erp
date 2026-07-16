@@ -12,7 +12,7 @@ const USE_DOCKER = process.env.DB_USE_DOCKER !== "false";
 function buildPgDumpArgs() {
   const dbUser = process.env.DB_USER || "maxan_user";
   const dbName = process.env.DB_NAME || "maxan_erp";
-  return ["-U", dbUser, "--column-inserts", "--no-owner", "--no-acl", dbName];
+  return ["-U", dbUser, "--clean", "--if-exists", "--column-inserts", "--no-owner", "--no-acl", dbName];
 }
 
 function spawnPgDump() {
