@@ -191,6 +191,6 @@ BEGIN
 
   -- Ankaras
   INSERT INTO helpdesk.recursos (cliente_id, nombre, tipo, marca, modelo, serial) VALUES
-    (v_ankaras, 'ASUS X415', 'Computador', 'ASUS', 'X415', 'R2N0CV09X683088');
+    (v_ankaras, 'ASUS X415', 'Computador', 'ASUS', 'X415', 'R2N0CV09X683088', NULL);
 
 END $$;

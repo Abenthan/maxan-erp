@@ -823,7 +823,7 @@ BEGIN
     (v_simbolo, 'Acer A514',             'Computador','Acer', 'A514', NULL, NULL),
     (v_bekko, 'ASUS Vivobook 14', 'Computador', 'ASUS', 'Vivobook 14', 'M1N0CX023456012', NULL),
     (v_m2_contable, 'Office 365 personal', 'Office 365', NULL, NULL, NULL, 'Suscripción anual'),
-    (v_ankaras, 'ASUS X415', 'Computador', 'ASUS', 'X415', 'R2N0CV09X683088')
+    (v_ankaras, 'ASUS X415', 'Computador', 'ASUS', 'X415', 'R2N0CV09X683088', NULL)
   ON CONFLICT (serial) DO NOTHING;
 END $$;
 
