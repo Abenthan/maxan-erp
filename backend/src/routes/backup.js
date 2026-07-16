@@ -10,10 +10,12 @@ router.use(authenticate, authorize("usuarios.gestionar"));
 const DB_CONTAINER = process.env.DB_DOCKER_CONTAINER || "maxan_db_dev";
 const USE_DOCKER = process.env.DB_USE_DOCKER !== "false";
 
+const SCHEMAS_TO_DROP = ["helpdesk", "cartera", "usuarios", "gastos", "compras", "inventario", "facturacion"];
+
 function buildPgDumpArgs() {
   const dbUser = process.env.DB_USER || "maxan_user";
   const dbName = process.env.DB_NAME || "maxan_erp";
-  return ["-U", dbUser, "--clean", "--if-exists", "--column-inserts", "--no-owner", "--no-acl", dbName];
+  return ["-U", dbUser, "--column-inserts", "--no-owner", "--no-acl", dbName];
 }
 
 function spawnPgDump() {
@@ -40,6 +42,9 @@ router.get("/descargar", (req, res) => {
 
   res.setHeader("Content-Type", "application/sql; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+  const dropSchemas = SCHEMAS_TO_DROP.map((s) => `DROP SCHEMA IF EXISTS ${s} CASCADE;`).join("\n");
+  res.write(dropSchemas + "\n\n");
 
   const proc = spawnPgDump();
 
