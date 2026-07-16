@@ -213,7 +213,70 @@ CREATE TABLE IF NOT EXISTS compras.facturas_compra_archivos (
 );
 
 -- ============================================================
--- 3. SCHEMA INVENTARIO
+-- 3. SCHEMA GASTOS
+-- ============================================================
+CREATE SCHEMA IF NOT EXISTS gastos;
+
+CREATE TABLE IF NOT EXISTS gastos.clasificaciones (
+    id          SERIAL PRIMARY KEY,
+    nombre      VARCHAR(50) NOT NULL UNIQUE,
+    created_at  TIMESTAMP DEFAULT now()
+);
+
+INSERT INTO gastos.clasificaciones (nombre) VALUES
+    ('Suministros'), ('Operacional'), ('Administrativo')
+ON CONFLICT (nombre) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS gastos.gastos (
+    id                  SERIAL PRIMARY KEY,
+    factura_compra_id   INT REFERENCES compras.facturas_compra(id) ON DELETE CASCADE,
+    proveedor_id        INT REFERENCES facturacion.terceros(id),
+    producto_id         INT REFERENCES inventario.productos(id),
+    venta_item_id        INT REFERENCES facturacion.ventas_items(id),
+    descripcion          TEXT NOT NULL,
+    clasificacion         VARCHAR(20) NOT NULL,
+    cantidad              NUMERIC(18,6) NOT NULL DEFAULT 1,
+    valor_unitario         NUMERIC(18,2) NOT NULL,
+    valor_total            NUMERIC(18,2) NOT NULL,
+    fecha                  DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at             TIMESTAMP DEFAULT now(),
+    updated_at             TIMESTAMP DEFAULT now(),
+    CHECK (NOT (producto_id IS NOT NULL AND venta_item_id IS NOT NULL))
+);
+
+ALTER TABLE gastos.gastos ADD COLUMN IF NOT EXISTS codigo_producto VARCHAR(50);
+
+ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS gastos_clasificacion_check;
+ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS gastos_gastos_clasificacion_check;
+ALTER TABLE gastos.gastos ADD CONSTRAINT fk_gasto_clasificacion
+    FOREIGN KEY (clasificacion) REFERENCES gastos.clasificaciones(nombre);
+
+CREATE INDEX IF NOT EXISTS idx_gastos_factura_compra ON gastos.gastos(factura_compra_id);
+CREATE INDEX IF NOT EXISTS idx_gastos_producto       ON gastos.gastos(producto_id);
+CREATE INDEX IF NOT EXISTS idx_gastos_venta_item     ON gastos.gastos(venta_item_id);
+
+DROP TRIGGER IF EXISTS trg_gastos_updated_at ON gastos.gastos;
+CREATE TRIGGER trg_gastos_updated_at
+    BEFORE UPDATE ON gastos.gastos
+    FOR EACH ROW EXECUTE FUNCTION facturacion.fn_set_updated_at();
+
+CREATE OR REPLACE FUNCTION gastos.fn_set_clasificacion()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.producto_id IS NOT NULL THEN
+        NEW.clasificacion := 'Suministros';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_gastos_set_clasificacion ON gastos.gastos;
+CREATE TRIGGER trg_gastos_set_clasificacion
+    BEFORE INSERT OR UPDATE ON gastos.gastos
+    FOR EACH ROW EXECUTE FUNCTION gastos.fn_set_clasificacion();
+
+-- ============================================================
+-- 4. SCHEMA INVENTARIO
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS inventario;
 
@@ -277,69 +340,7 @@ LEFT JOIN inventario.entradas e ON e.producto_id = p.id
 WHERE p.inventariable = TRUE
 GROUP BY p.id, p.nombre, p.categoria;
 
--- ============================================================
--- 4. SCHEMA GASTOS
--- ============================================================
-CREATE SCHEMA IF NOT EXISTS gastos;
-
-CREATE TABLE IF NOT EXISTS gastos.clasificaciones (
-    id          SERIAL PRIMARY KEY,
-    nombre      VARCHAR(50) NOT NULL UNIQUE,
-    created_at  TIMESTAMP DEFAULT now()
-);
-
-INSERT INTO gastos.clasificaciones (nombre) VALUES
-    ('Suministros'), ('Operacional'), ('Administrativo')
-ON CONFLICT (nombre) DO NOTHING;
-
-CREATE TABLE IF NOT EXISTS gastos.gastos (
-    id                  SERIAL PRIMARY KEY,
-    factura_compra_id   INT REFERENCES compras.facturas_compra(id) ON DELETE CASCADE,
-    proveedor_id        INT REFERENCES facturacion.terceros(id),
-    producto_id         INT REFERENCES inventario.productos(id),
-    venta_item_id        INT REFERENCES facturacion.ventas_items(id),
-    descripcion          TEXT NOT NULL,
-    clasificacion         VARCHAR(20) NOT NULL,
-    cantidad              NUMERIC(18,6) NOT NULL DEFAULT 1,
-    valor_unitario         NUMERIC(18,2) NOT NULL,
-    valor_total            NUMERIC(18,2) NOT NULL,
-    fecha                  DATE NOT NULL DEFAULT CURRENT_DATE,
-    created_at             TIMESTAMP DEFAULT now(),
-    updated_at             TIMESTAMP DEFAULT now(),
-    CHECK (NOT (producto_id IS NOT NULL AND venta_item_id IS NOT NULL))
-);
-
-ALTER TABLE gastos.gastos ADD COLUMN IF NOT EXISTS codigo_producto VARCHAR(50);
-
-ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS gastos_clasificacion_check;
-ALTER TABLE gastos.gastos DROP CONSTRAINT IF EXISTS gastos_gastos_clasificacion_check;
-ALTER TABLE gastos.gastos ADD CONSTRAINT fk_gasto_clasificacion
-    FOREIGN KEY (clasificacion) REFERENCES gastos.clasificaciones(nombre);
-
-CREATE INDEX IF NOT EXISTS idx_gastos_factura_compra ON gastos.gastos(factura_compra_id);
-CREATE INDEX IF NOT EXISTS idx_gastos_producto       ON gastos.gastos(producto_id);
-CREATE INDEX IF NOT EXISTS idx_gastos_venta_item     ON gastos.gastos(venta_item_id);
-
-DROP TRIGGER IF EXISTS trg_gastos_updated_at ON gastos.gastos;
-CREATE TRIGGER trg_gastos_updated_at
-    BEFORE UPDATE ON gastos.gastos
-    FOR EACH ROW EXECUTE FUNCTION facturacion.fn_set_updated_at();
-
-CREATE OR REPLACE FUNCTION gastos.fn_set_clasificacion()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.producto_id IS NOT NULL THEN
-        NEW.clasificacion := 'Suministros';
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_gastos_set_clasificacion ON gastos.gastos;
-CREATE TRIGGER trg_gastos_set_clasificacion
-    BEFORE INSERT OR UPDATE ON gastos.gastos
-    FOR EACH ROW EXECUTE FUNCTION gastos.fn_set_clasificacion();
-
+-- El trigger fn_crear_entrada se define aquí, después que gastos e inventario existen
 CREATE OR REPLACE FUNCTION inventario.fn_crear_entrada()
 RETURNS TRIGGER AS $$
 DECLARE
