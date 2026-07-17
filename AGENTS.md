@@ -400,3 +400,13 @@ La migración `16_helpdesk_schema.sql` incluye:
 - Datos no reclamados se limpian automáticamente después de 30 minutos.
 - Detección de tipo de disco (SSD/HDD) vía `MSFT_PhysicalDisk` (fallback a `Win32_DiskDrive`).
 - Detección de chip de video + VRAM vía `Win32_VideoController`.
+
+### Página global de recursos (`/recursos`)
+- Ruta **standalone** fuera de `/helpdesk/*`, sin necesidad de cliente seleccionado en HelpdeskContext
+- Muestra **todos** los recursos independientemente del cliente
+- Usa `HelpdeskLayout` sin `HelpdeskProvider` (el provider se inyecta pero sin cliente)
+- Columna "Cliente" clickeable (requiere `helpdesk.gestionar`) → modal con búsqueda de clientes para **asignar/cambiar** el cliente
+- Filtro por texto + checkbox "Solo sin cliente"
+- Guarda vía `PUT /api/helpdesk/recursos/:id` con todos los campos del recurso
+- Pestaña "Todos los Recursos" en `HelpdeskNav` visible siempre que se tenga `helpdesk.ver`, sin depender de cliente seleccionado
+- **Backend**: los endpoints `listar`, `obtener` y `detectarPC` usan `LEFT JOIN` en lugar de `JOIN` para incluir recursos sin cliente (`cliente_id IS NULL`)

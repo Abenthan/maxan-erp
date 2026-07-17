@@ -43,6 +43,7 @@ import Mantenimientos from "./pages/helpdesk/Mantenimientos";
 import MantenimientoNuevo from "./pages/helpdesk/MantenimientoNuevo";
 import MantenimientoDetalle from "./pages/helpdesk/MantenimientoDetalle";
 import CategoriasCaso from "./pages/helpdesk/CategoriasCaso";
+import RecursosGlobal from "./pages/helpdesk/RecursosGlobal";
 import CRM from "./pages/CRM";
 import { ApiProvider } from "./context/ApiContext";
 import { DashboardProvider } from "./context/DashboardContext";
@@ -92,6 +93,7 @@ function HelpdeskNav() {
     ...(cliente && puedeVer ? [{ ruta: "/helpdesk/recursos", label: "Recursos" }] : []),
     ...(cliente && puedeVer ? [{ ruta: "/helpdesk/mantenimientos", label: "Mantenimientos" }] : []),
     ...(puedeGestionarCasos ? [{ ruta: "/helpdesk/categorias-caso", label: "Categorías" }] : []),
+    ...(puedeVer ? [{ ruta: "/recursos", label: "Todos los Recursos" }] : []),
   ];
 
   return (
@@ -194,6 +196,7 @@ function App() {
             <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
             <Route path="/nuevo-tercero" element={<ProtectedRoute permiso="terceros.gestionar"><NuevoTercero /></ProtectedRoute>} />
             <Route path="/terceros" element={<HelpdeskProvider><HelpdeskLayout titulo="Clientes" color="bg-blue-600"><ProtectedRoute permiso="terceros.ver"><Terceros /></ProtectedRoute></HelpdeskLayout></HelpdeskProvider>} />
+            <Route path="/recursos" element={<HelpdeskProvider><HelpdeskLayout titulo="Todos los Recursos" color="bg-amber-600"><ProtectedRoute permiso="helpdesk.ver"><RecursosGlobal /></ProtectedRoute></HelpdeskLayout></HelpdeskProvider>} />
           </Routes>
         </DashboardProvider>
       </ApiProvider>

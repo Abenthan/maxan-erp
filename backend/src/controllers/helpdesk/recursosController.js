@@ -13,7 +13,7 @@ exports.listar = async (req, res) => {
   const { q, cliente_id, tipo } = req.query;
   let sql = `SELECT r.*, t.razon_social AS cliente_nombre
              FROM helpdesk.recursos r
-             JOIN facturacion.terceros t ON t.id = r.cliente_id
+             LEFT JOIN facturacion.terceros t ON t.id = r.cliente_id
              WHERE r.activo = true`;
   const params = [];
   if (q) {
@@ -42,7 +42,7 @@ exports.obtener = async (req, res) => {
     const result = await db(req).query(
       `SELECT r.*, t.razon_social AS cliente_nombre
        FROM helpdesk.recursos r
-       JOIN facturacion.terceros t ON t.id = r.cliente_id
+       LEFT JOIN facturacion.terceros t ON t.id = r.cliente_id
        WHERE r.id = $1`,
       [req.params.id]
     );
@@ -116,7 +116,7 @@ exports.detectarPC = async (req, res) => {
     const result = await db(req).query(
       `SELECT r.*, t.razon_social AS cliente_nombre
        FROM helpdesk.recursos r
-       JOIN facturacion.terceros t ON t.id = r.cliente_id
+       LEFT JOIN facturacion.terceros t ON t.id = r.cliente_id
        WHERE r.serial = $1`,
       [serial]
     );
