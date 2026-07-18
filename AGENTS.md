@@ -144,7 +144,7 @@
 ## Schemas SQL
 - `db/init/01_schema.sql` — Schema consolidado (facturacion, compras, inventario, gastos, cartera, usuarios, generales, helpdesk). Se ejecuta automáticamente al crear el contenedor PostgreSQL por primera vez via `docker-entrypoint-initdb.d`.
 - `db/migrar_produccion.sql` — Script para ejecutar en DBeaver contra una BD de producción que se creó antes de tener el schema consolidado. Crea schemas cartera, usuarios, helpdesk y tablas faltantes.
-- Migraciones individuales en `db/`: `01_schema.sql` a `21_casos_recursos.sql` (histórico, todo consolidado en `db/init/01_schema.sql`)
+- Migraciones individuales en `db/`: `01_schema.sql` a `23_tipos_detalle.sql` (histórico, todo consolidado en `db/init/01_schema.sql`)
 - `db/migrar_contactos_a_generales.sql` — Migración para mover `helpdesk.contactos` a `generales.contactos` en BD existentes.
 
 ## Schema `generales` (tablas compartidas entre módulos)
@@ -203,6 +203,14 @@
 37. **HelpdeskNav oculto en /recursos** — el nav solo se mostraba cuando `cliente` estaba seleccionado (`{cliente && <HelpdeskNav />}`), pero pestañas como "Todos los Recursos" y "Categorías" no requieren cliente. Solución: cambiar a siempre mostrar `<HelpdeskNav />` (las pestañas ya se filtran internamente).
 38. **CasoDetalle sin modo edición** — no había forma de editar campos del caso (título, descripción, categoría, técnico, contacto). Se agregó botón "Editar" con toggle inline siguiendo el patrón de RecursoDetalle. Guarda vía `PUT /helpdesk/casos/:id`.
 39. **helpdesk.contactos movido a generales.contactos** — la tabla de contactos estaba en `helpdesk` pero es necesaria para CRM y otros módulos. Se creó schema `generales`, se migró la tabla y se actualizaron FKs y rutas. Migración en `db/migrar_contactos_a_generales.sql`.
+40. **Edición de detalles de caso** — se agregó `PUT /helpdesk/casos/:id/detalles/:detalleId` con UPDATE dinámico. Cada detalle en la bitácora es editable inline (contenido, tipo, fecha, recurso asociado). Validación: fecha del detalle >= fecha de creación del caso.
+41. **Nuevos tipos de detalle** — se agregaron "Novedad" y "Observaciones" a la CHECK constraint de `helpdesk.caso_detalles.tipo`.
+42. **Recurso asociado a detalle** — columna `recurso_id` en `helpdesk.caso_detalles` (FK → `helpdesk.recursos`). Al crear o editar un detalle se puede seleccionar un recurso vinculado al caso.
+43. **Asignación de cliente en Casos.tsx** — columna "Cliente" clickeable que abre modal de búsqueda de terceros para asignar/cambiar cliente. Si hay cliente en HelpdeskContext, se asigna automáticamente. Checkbox "Sin cliente" en filtros.
+44. **UPDATE dinámico en casos** — `actualizar` en `casosController.js` ahora solo actualiza los campos enviados en el body, evitando que campos no enviados se pongan NULL.
+45. **Requerimiento de SQL habilitado** — se habilitó `require('pg').defaults.parseInt8 = true` para que los IDs grandes no pierdan precisión al serializarse como número.
+46. **Tipos de detalle como maestro** — se creó `helpdesk.tipos_detalle` (id, nombre, color) con FK desde `caso_detalles.tipo`, reemplazando el CHECK constraint. CRUD backend + página `/helpdesk/tipos-detalle` con admin visual. Migración `23_tipos_detalle.sql`.
+47. **Configuración Helpdesk** — nueva página `/helpdesk/configuracion` con cards de acceso a Categorías, Tipos de Detalle y Todos los Recursos. HelpdeskNav simplificado: se eliminaron esas 3 pestañas individuales + Mantenimientos, reemplazadas por una sola pestaña "Configuración".
 
 ## Cálculo de utilidad (`vw_utilidad_productos`)
 - **costo_adquisiciones** = SUM(entradas.cantidad × costo_unitario) — todo lo que entró a inventario (gastos Suministros que generan entrada via trigger)
@@ -357,6 +365,8 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/api/helpdesk/casos/:id/estado` | PATCH | `helpdesk.casos.gestionar` | Cambiar estado + registrar solución |
 | `/api/helpdesk/casos/:id/detalles` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | Bitácora del caso |
 | `/api/helpdesk/casos/:id/recursos` | GET | `helpdesk.casos.ver` | Listar recursos vinculados al caso |
+| `/api/helpdesk/casos/:id/detalles/:detalleId` | PUT | `helpdesk.casos.gestionar` | Editar detalle (contenido, tipo, created_at, recurso_id). Validación: created_at >= caso.created_at. UPDATE dinámico. |
+| `/api/helpdesk/casos/:id/recursos` | GET | `helpdesk.casos.ver` | Listar recursos vinculados al caso |
 | `/api/helpdesk/casos/:id/recursos` | POST | `helpdesk.casos.gestionar` | Vincular recurso(s) al caso (`{ recurso_ids: [1,2] }`) |
 | `/api/helpdesk/casos/:id/recursos/:recurso_id` | DELETE | `helpdesk.casos.gestionar` | Desvincular recurso del caso |
 | `/api/generales/contactos` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | CRUD contactos de clientes (uso cross-module) |
@@ -368,6 +378,9 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/api/helpdesk/tipos-recurso` | GET | `helpdesk.ver` | Listar tipos de recurso |
 | `/api/helpdesk/tipos-recurso` | POST | `helpdesk.gestionar` | Crear tipo de recurso |
 | `/api/helpdesk/tipos-recurso/:id` | DELETE | `helpdesk.gestionar` | Eliminar tipo de recurso (solo si no está en uso) |
+| `/api/helpdesk/tipos-detalle` | GET | `helpdesk.casos.ver` | Listar tipos de detalle (Comentario, Diagnóstico, etc.) |
+| `/api/helpdesk/tipos-detalle` | POST | `helpdesk.casos.gestionar` | Crear tipo de detalle (nombre + color) |
+| `/api/helpdesk/tipos-detalle/:id` | DELETE | `helpdesk.casos.gestionar` | Eliminar tipo de detalle (solo si no está en uso) |
 
 ### Frontend — Páginas
 | Ruta | Componente | Permiso | Descripción |
@@ -378,10 +391,12 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/helpdesk/recursos/:id` | `RecursoDetalle.tsx` | `helpdesk.ver` | Detalle del equipo + historial de mantenimientos + **casos de soporte vinculados**. Modo edición con campos fijos y `atributos` (tipo disco, chip video, VRAM). Botón Eliminar solo para admins (`usuarios.gestionar`). |
 | `/helpdesk/nuevo-recurso` | `NuevoRecurso.tsx` | `helpdesk.gestionar` | Formulario completo para crear cualquier tipo de recurso. Select tipo desde API + ⚙ para administrar tipos. |
 | `/helpdesk/obtener-pc` | `RegistrarPC.tsx` | `helpdesk.gestionar` | Detectar PC: script PS + formulario manual. Cliente desde contexto (no dropdown). |
-| `/helpdesk/casos` | `Casos.tsx` | `helpdesk.casos.ver` | Listado de casos con filtros (búsqueda, estado), tabla con #, título, cliente, **recursos**, categoría, técnico, estado. |
+| `/helpdesk/casos` | `Casos.tsx` | `helpdesk.casos.ver` | Listado de casos con filtros (búsqueda, estado, **checkbox "Sin cliente"**), tabla con #, título, **cliente clickeable (modal asignación)**, recursos, categoría, técnico, estado. Si hay cliente en contexto, se asigna automáticamente al hacer clic. |
 | `/helpdesk/casos/nuevo` | `CasoNuevo.tsx` | `helpdesk.casos.gestionar` | Formulario crear caso: título, descripción, categoría, técnico, cliente con búsqueda, **recursos multiselect** filtrado por cliente. |
-| `/helpdesk/casos/:id` | `CasoDetalle.tsx` | `helpdesk.casos.ver` | Detalle del caso con **recursos vinculados (chips + desvincular)**, bitácora, cambio de estado (Iniciar/Completar/Cancelar), campo de solución al cerrar. Botón "+ Vincular recurso" con selector. **Modo edición inline** (título, descripción, categoría, técnico, contacto) con botón "Editar" para usuarios con `helpdesk.casos.gestionar`. |
+| `/helpdesk/casos/:id` | `CasoDetalle.tsx` | `helpdesk.casos.ver` | Detalle del caso con **recursos vinculados (chips + desvincular)**, bitácora, cambio de estado (Iniciar/Completar/Cancelar), campo de solución al cerrar. Botón "+ Vincular recurso" con selector. **Modo edición inline** (título, descripción, categoría, técnico, contacto, fecha de creación) con botón "Editar" para usuarios con `helpdesk.casos.gestionar`. **Detalles editables inline** (contenido, tipo, fecha, recurso asociado). Tipos cargados desde API: Comentario, Diagnóstico, Solución, Acuerdo, Sistema, Novedad, Observaciones. |
 | `/helpdesk/categorias-caso` | `CategoriasCaso.tsx` | `helpdesk.casos.gestionar` | Administrar categorías (agregar/eliminar con selector de color). |
+| `/helpdesk/tipos-detalle` | `TiposDetalle.tsx` | `helpdesk.casos.gestionar` | Administrar tipos de detalle (agregar/eliminar con selector de color). |
+| `/helpdesk/configuracion` | `ConfiguracionHelpdesk.tsx` | `helpdesk.ver` | Página de configuración Helpdesk con cards de acceso a Categorías, Tipos de Detalle y Todos los Recursos. |
 
 ### Permisos (seed automático)
 | Código | Módulo | Descripción |

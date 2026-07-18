@@ -44,6 +44,8 @@ import Mantenimientos from "./pages/helpdesk/Mantenimientos";
 import MantenimientoNuevo from "./pages/helpdesk/MantenimientoNuevo";
 import MantenimientoDetalle from "./pages/helpdesk/MantenimientoDetalle";
 import CategoriasCaso from "./pages/helpdesk/CategoriasCaso";
+import TiposDetalle from "./pages/helpdesk/TiposDetalle";
+import ConfiguracionHelpdesk from "./pages/helpdesk/ConfiguracionHelpdesk";
 import RecursosGlobal from "./pages/helpdesk/RecursosGlobal";
 import CRM from "./pages/CRM";
 import { ApiProvider } from "./context/ApiContext";
@@ -92,9 +94,7 @@ function HelpdeskNav() {
     ...(cliente ? [{ ruta: "/helpdesk", label: "Inicio" }] : []),
     ...(cliente && puedeCasos ? [{ ruta: "/helpdesk/casos", label: "Casos" }] : []),
     ...(cliente && puedeVer ? [{ ruta: "/helpdesk/recursos", label: "Recursos" }] : []),
-    ...(cliente && puedeVer ? [{ ruta: "/helpdesk/mantenimientos", label: "Mantenimientos" }] : []),
-    ...(puedeGestionarCasos ? [{ ruta: "/helpdesk/categorias-caso", label: "Categorías" }] : []),
-    ...(puedeVer ? [{ ruta: "/recursos", label: "Todos los Recursos" }] : []),
+    ...(puedeVer || puedeGestionarCasos ? [{ ruta: "/helpdesk/configuracion", label: "Configuración" }] : []),
   ];
 
   return (
@@ -139,7 +139,9 @@ function HelpdeskRoutes() {
           <Route path="mantenimientos" element={<ProtectedRoute permiso="helpdesk.ver"><Mantenimientos /></ProtectedRoute>} />
           <Route path="mantenimientos/nuevo" element={<ProtectedRoute permiso="helpdesk.gestionar"><MantenimientoNuevo /></ProtectedRoute>} />
           <Route path="mantenimientos/:id" element={<ProtectedRoute permiso="helpdesk.ver"><MantenimientoDetalle /></ProtectedRoute>} />
+          <Route path="configuracion" element={<ProtectedRoute permiso="helpdesk.ver"><ConfiguracionHelpdesk /></ProtectedRoute>} />
           <Route path="categorias-caso" element={<ProtectedRoute permiso="helpdesk.casos.gestionar"><CategoriasCaso /></ProtectedRoute>} />
+          <Route path="tipos-detalle" element={<ProtectedRoute permiso="helpdesk.casos.gestionar"><TiposDetalle /></ProtectedRoute>} />
         </Routes>
       </div>
     </HelpdeskLayout>

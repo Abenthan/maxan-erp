@@ -158,9 +158,11 @@ exports.cambiarEstado = async (req, res) => {
 exports.listarDetalles = async (req, res) => {
   try {
     const result = await db(req).query(
-      `SELECT d.*, u.nombres || ' ' || u.apellidos AS creado_por_nombre
+      `SELECT d.*, u.nombres || ' ' || u.apellidos AS creado_por_nombre,
+              r.nombre AS recurso_nombre, r.serial AS recurso_serial
        FROM helpdesk.caso_detalles d
        LEFT JOIN usuarios.usuarios u ON u.id = d.creado_por
+       LEFT JOIN helpdesk.recursos r ON r.id = d.recurso_id
        WHERE d.caso_id = $1
        ORDER BY d.created_at`,
       [req.params.id]
@@ -172,14 +174,49 @@ exports.listarDetalles = async (req, res) => {
 };
 
 exports.crearDetalle = async (req, res) => {
-  const { contenido, tipo } = req.body;
+  const { contenido, tipo, recurso_id } = req.body;
   try {
     const result = await db(req).query(
-      `INSERT INTO helpdesk.caso_detalles (caso_id, creado_por, contenido, tipo)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.params.id, req.user?.id, contenido, tipo || 'Comentario']
+      `INSERT INTO helpdesk.caso_detalles (caso_id, creado_por, contenido, tipo, recurso_id)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [req.params.id, req.user?.id, contenido, tipo || 'Comentario', recurso_id || null]
     );
     res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.actualizarDetalle = async (req, res) => {
+  const { contenido, tipo, created_at, recurso_id } = req.body;
+  const camposPermitidos = ["contenido", "tipo", "created_at", "recurso_id"];
+  const sets = [];
+  const params = [];
+  let idx = 1;
+  for (const campo of camposPermitidos) {
+    if (req.body[campo] !== undefined) {
+      sets.push(`${campo}=$${idx++}`);
+      params.push(req.body[campo]);
+    }
+  }
+  if (sets.length === 0) return res.status(400).json({ error: "No hay campos para actualizar" });
+
+  if (created_at) {
+    const casoResult = await db(req).query("SELECT created_at FROM helpdesk.casos WHERE id = $1", [req.params.id]);
+    if (casoResult.rows.length === 0) return res.status(404).json({ error: "Caso no encontrado" });
+    if (new Date(created_at) < new Date(casoResult.rows[0].created_at)) {
+      return res.status(400).json({ error: "La fecha del detalle no puede ser anterior a la fecha de creación del caso" });
+    }
+  }
+
+  params.push(req.params.detalleId);
+  try {
+    const result = await db(req).query(
+      `UPDATE helpdesk.caso_detalles SET ${sets.join(", ")} WHERE id=$${idx} RETURNING *`,
+      params
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: "Detalle no encontrado" });
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

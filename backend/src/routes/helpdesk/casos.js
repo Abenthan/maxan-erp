@@ -11,6 +11,7 @@ router.put("/:id", authorize("helpdesk.casos.gestionar"), controller.actualizar)
 router.patch("/:id/estado", authorize("helpdesk.casos.gestionar"), controller.cambiarEstado);
 router.get("/:id/detalles", authorize("helpdesk.casos.ver"), controller.listarDetalles);
 router.post("/:id/detalles", authorize("helpdesk.casos.gestionar"), controller.crearDetalle);
+router.put("/:id/detalles/:detalleId", authorize("helpdesk.casos.gestionar"), controller.actualizarDetalle);
 
 router.get("/:id/recursos", authorize("helpdesk.casos.ver"), controller.listarRecursos);
 router.post("/:id/recursos", authorize("helpdesk.casos.gestionar"), controller.vincularRecursos);

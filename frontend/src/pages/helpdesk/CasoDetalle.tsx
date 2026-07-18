@@ -18,6 +18,7 @@ interface Caso {
 
 interface Detalle {
   id: number; contenido: string; tipo: string; creado_por_nombre: string; created_at: string;
+  recurso_id: number | null; recurso_nombre: string; recurso_serial: string;
 }
 
 interface Recurso {
@@ -36,6 +37,10 @@ interface Contacto {
   id: number; nombre: string; telefono: string;
 }
 
+interface TipoDetalle {
+  id: number; nombre: string; color: string;
+}
+
 export default function CasoDetalle() {
   const { id } = useParams();
   const api = useApi();
@@ -46,9 +51,13 @@ export default function CasoDetalle() {
   const [detalles, setDetalles] = useState<Detalle[]>([]);
   const [cargando, setCargando] = useState(true);
   const [nuevoDetalle, setNuevoDetalle] = useState("");
+  const [nuevoTipo, setNuevoTipo] = useState("Comentario");
+  const [nuevoRecursoId, setNuevoRecursoId] = useState("");
   const [solucionTexto, setSolucionTexto] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [confirmarCierre, setConfirmarCierre] = useState(false);
+
+  const [tipos, setTipos] = useState<TipoDetalle[]>([]);
 
   const [mostrarVinculador, setMostrarVinculador] = useState(false);
   const [recursosDisponibles, setRecursosDisponibles] = useState<Recurso[]>([]);
@@ -62,6 +71,9 @@ export default function CasoDetalle() {
     titulo: "", descripcion: "", categoria_id: "", tecnico_id: "", contacto_id: "", created_at: "",
   });
 
+  const [editandoDetalleId, setEditandoDetalleId] = useState<number | null>(null);
+  const [detalleForm, setDetalleForm] = useState({ contenido: "", tipo: "", created_at: "", recurso_id: "" });
+
   useEffect(() => {
     Promise.all([
       api.get<Caso>(`/helpdesk/casos/${id}`),
@@ -70,6 +82,7 @@ export default function CasoDetalle() {
       .then(([c, d]) => { setCaso(c); setDetalles(d); setSolucionTexto(c.solucion || ""); })
       .catch(() => navigate("/helpdesk/casos"))
       .finally(() => setCargando(false));
+    api.get<TipoDetalle[]>("/helpdesk/tipos-detalle").then(setTipos).catch(() => {});
   }, [id, api, navigate]);
 
   function iniciarEdicion() {
@@ -158,13 +171,48 @@ export default function CasoDetalle() {
     }
   }
 
+  function iniciarEdicionDetalle(d: Detalle) {
+    setDetalleForm({
+      contenido: d.contenido || "",
+      tipo: d.tipo || "Comentario",
+      created_at: d.created_at ? new Date(d.created_at).toISOString().slice(0, 16) : "",
+      recurso_id: d.recurso_id?.toString() || "",
+    });
+    setEditandoDetalleId(d.id);
+  }
+
+  async function guardarEdicionDetalle() {
+    if (!editandoDetalleId || !detalleForm.contenido.trim()) return;
+    if (detalleForm.created_at && caso && new Date(detalleForm.created_at) < new Date(caso.created_at)) {
+      return alert("La fecha del detalle no puede ser anterior a la fecha de creación del caso");
+    }
+    setGuardando(true);
+    try {
+      const body: any = { contenido: detalleForm.contenido, tipo: detalleForm.tipo };
+      if (detalleForm.created_at) body.created_at = detalleForm.created_at;
+      body.recurso_id = detalleForm.recurso_id ? Number(detalleForm.recurso_id) : null;
+      await api.put(`/helpdesk/casos/${id}/detalles/${editandoDetalleId}`, body);
+      const updated = await api.get<Detalle[]>(`/helpdesk/casos/${id}/detalles`);
+      setDetalles(updated);
+      setEditandoDetalleId(null);
+    } catch (e: any) {
+      alert(e.message || "Error al guardar detalle");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   async function agregarDetalle() {
     if (!nuevoDetalle.trim()) return;
     setGuardando(true);
     try {
-      const d = await api.post<Detalle>(`/helpdesk/casos/${id}/detalles`, { contenido: nuevoDetalle });
+      const body: any = { contenido: nuevoDetalle, tipo: nuevoTipo };
+      if (nuevoRecursoId) body.recurso_id = Number(nuevoRecursoId);
+      const d = await api.post<Detalle>(`/helpdesk/casos/${id}/detalles`, body);
       setDetalles((prev) => [...prev, d]);
       setNuevoDetalle("");
+      setNuevoTipo("Comentario");
+      setNuevoRecursoId("");
     } catch (e: any) {
       alert(e.message || "Error al agregar detalle");
     } finally {
@@ -204,6 +252,8 @@ export default function CasoDetalle() {
       case "Solución": return "bg-green-100 text-green-700";
       case "Acuerdo": return "bg-blue-100 text-blue-700";
       case "Sistema": return "bg-gray-100 text-gray-500";
+      case "Novedad": return "bg-orange-100 text-orange-700";
+      case "Observaciones": return "bg-teal-100 text-teal-700";
       default: return "bg-amber-100 text-amber-700";
     }
   };
@@ -418,12 +468,58 @@ export default function CasoDetalle() {
               <div key={d.id} className="flex gap-3 text-sm">
                 <div className="w-2 h-2 rounded-full bg-amber-400 mt-1.5 shrink-0" />
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-medium text-gray-600">{d.creado_por_nombre || "Sistema"}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-xs ${tipoBadge(d.tipo)}`}>{d.tipo}</span>
-                    <span className="text-xs text-gray-400">{new Date(d.created_at).toLocaleString()}</span>
-                  </div>
-                  <p className="text-gray-700 whitespace-pre-wrap">{d.contenido}</p>
+                  {editandoDetalleId === d.id ? (
+                    <div className="space-y-2 border border-amber-200 rounded-lg p-3 bg-amber-50">
+                      <textarea value={detalleForm.contenido} onChange={(e) => setDetalleForm({...detalleForm, contenido: e.target.value})}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" rows={2} />
+                      <div className="grid grid-cols-3 gap-2">
+                        <select value={detalleForm.tipo} onChange={(e) => setDetalleForm({...detalleForm, tipo: e.target.value})}
+                          className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                          {tipos.length > 0 ? tipos.map((t) => (
+                            <option key={t.id} value={t.nombre}>{t.nombre}</option>
+                          )) : (
+                            <option value="Comentario">Comentario</option>
+                          )}
+                        </select>
+                        <input type="datetime-local" value={detalleForm.created_at}
+                          onChange={(e) => setDetalleForm({...detalleForm, created_at: e.target.value})}
+                          className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg" />
+                        <select value={detalleForm.recurso_id} onChange={(e) => setDetalleForm({...detalleForm, recurso_id: e.target.value})}
+                          className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                          <option value="">Sin recurso</option>
+                          {recursos.map((r) => (
+                            <option key={r.id} value={r.id}>{r.nombre}{r.serial ? ` (${r.serial})` : ""}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={guardarEdicionDetalle} disabled={guardando}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50">
+                          {guardando ? "Guardando..." : "Guardar"}
+                        </button>
+                        <button onClick={() => setEditandoDetalleId(null)} className="text-xs text-gray-500 underline">Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-xs font-medium text-gray-600">{d.creado_por_nombre || "Sistema"}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-xs ${tipoBadge(d.tipo)}`}>{d.tipo}</span>
+                        <span className="text-xs text-gray-400">{new Date(d.created_at).toLocaleString()}</span>
+                        {d.recurso_nombre && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
+                            {d.recurso_nombre}
+                            {d.recurso_serial && <span className="text-gray-400 font-mono">({d.recurso_serial})</span>}
+                          </span>
+                        )}
+                        {puedeGestionar && (
+                          <button type="button" onClick={() => iniciarEdicionDetalle(d)}
+                            className="ml-auto text-xs text-amber-600 hover:text-amber-800">Editar</button>
+                        )}
+                      </div>
+                      <p className="text-gray-700 whitespace-pre-wrap">{d.contenido}</p>
+                    </>
+                  )}
                 </div>
               </div>
             ))
@@ -431,17 +527,34 @@ export default function CasoDetalle() {
         </div>
 
         {puedeGestionar && (
-          <div className="flex gap-2">
-            <input
-              className="flex-1 border rounded-lg px-3 py-2 text-sm"
-              placeholder="Agregar novedad..."
-              value={nuevoDetalle}
-              onChange={(e) => setNuevoDetalle(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && agregarDetalle()}
-            />
-            <button onClick={agregarDetalle} disabled={guardando || !nuevoDetalle.trim()} className="px-4 py-2 text-sm rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 disabled:opacity-50">
-              Agregar
-            </button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                placeholder="Agregar novedad..."
+                value={nuevoDetalle}
+                onChange={(e) => setNuevoDetalle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && agregarDetalle()}
+              />
+              <select value={nuevoTipo} onChange={(e) => setNuevoTipo(e.target.value)}
+                className="border rounded-lg px-2 py-2 text-sm">
+                {tipos.length > 0 ? tipos.map((t) => (
+                  <option key={t.id} value={t.nombre}>{t.nombre}</option>
+                )) : (
+                  <option value="Comentario">Comentario</option>
+                )}
+              </select>
+              <select value={nuevoRecursoId} onChange={(e) => setNuevoRecursoId(e.target.value)}
+                className="border rounded-lg px-2 py-2 text-sm max-w-[180px]">
+                <option value="">Sin recurso</option>
+                {recursos.map((r) => (
+                  <option key={r.id} value={r.id}>{r.nombre}{r.serial ? ` (${r.serial})` : ""}</option>
+                ))}
+              </select>
+              <button onClick={agregarDetalle} disabled={guardando || !nuevoDetalle.trim()} className="px-4 py-2 text-sm rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 disabled:opacity-50 shrink-0">
+                Agregar
+              </button>
+            </div>
           </div>
         )}
       </div>
