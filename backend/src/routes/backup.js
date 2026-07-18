@@ -10,7 +10,7 @@ router.use(authenticate, authorize("usuarios.gestionar"));
 const DB_CONTAINER = process.env.DB_DOCKER_CONTAINER || "maxan_db_dev";
 const USE_DOCKER = process.env.DB_USE_DOCKER !== "false";
 
-const SCHEMAS_TO_DROP = ["helpdesk", "cartera", "usuarios", "gastos", "compras", "inventario", "facturacion"];
+const SCHEMAS_TO_DROP = ["helpdesk", "cartera", "usuarios", "gastos", "compras", "inventario", "facturacion", "generales"];
 
 function buildPgDumpArgs() {
   const dbUser = process.env.DB_USER || "maxan_user";
