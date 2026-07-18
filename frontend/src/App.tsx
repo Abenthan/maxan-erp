@@ -25,6 +25,7 @@ import Pagos from "./pages/Pagos";
 import NuevoPago from "./pages/NuevoPago";
 import Retenciones from "./pages/Retenciones";
 import Terceros from "./pages/Terceros";
+import Contactos from "./pages/Contactos";
 import NuevoTercero from "./pages/NuevoTercero";
 import Usuarios from "./pages/Usuarios";
 import Roles from "./pages/Roles";
@@ -153,7 +154,7 @@ function ConfiguracionRoutes() {
     { ruta: "/configuracion/backup", label: "Copia de Seguridad" },
   ];
   return (
-    <HelpdeskLayout titulo="Configuración" color="bg-gray-600">
+    <HelpdeskLayout titulo="Configuración" color="bg-gray-600" mostrarCliente={false}>
       <div>
         <nav className="flex gap-1 mb-6 border-b border-gray-200">
           {tabs.map((t) => (
@@ -181,6 +182,39 @@ function ConfiguracionRoutes() {
   );
 }
 
+function BasesDeDatosRoutes() {
+  const location = useLocation();
+  const tabs = [
+    { ruta: "/bases-de-datos/terceros", label: "Terceros" },
+    { ruta: "/bases-de-datos/contactos", label: "Contactos" },
+  ];
+  return (
+    <HelpdeskLayout titulo="Bases de Datos" color="bg-teal-600" mostrarCliente={false}>
+      <div>
+        <nav className="flex gap-1 mb-6 border-b border-gray-200">
+          {tabs.map((t) => (
+            <Link
+              key={t.ruta}
+              to={t.ruta}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                location.pathname === t.ruta
+                  ? "border-teal-600 text-teal-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+        <Routes>
+          <Route path="terceros" element={<ProtectedRoute permiso="terceros.ver"><Terceros /></ProtectedRoute>} />
+          <Route path="contactos" element={<ProtectedRoute permiso="helpdesk.casos.ver"><Contactos /></ProtectedRoute>} />
+        </Routes>
+      </div>
+    </HelpdeskLayout>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -195,8 +229,9 @@ function App() {
             <Route path="/configuracion/*" element={<HelpdeskProvider><ConfiguracionRoutes /></HelpdeskProvider>} />
             <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
             <Route path="/nuevo-tercero" element={<ProtectedRoute permiso="terceros.gestionar"><NuevoTercero /></ProtectedRoute>} />
-            <Route path="/terceros" element={<HelpdeskProvider><HelpdeskLayout titulo="Clientes" color="bg-blue-600"><ProtectedRoute permiso="terceros.ver"><Terceros /></ProtectedRoute></HelpdeskLayout></HelpdeskProvider>} />
-            <Route path="/recursos" element={<HelpdeskProvider><HelpdeskLayout titulo="Todos los Recursos" color="bg-amber-600"><div><HelpdeskNav /><ProtectedRoute permiso="helpdesk.ver"><RecursosGlobal /></ProtectedRoute></div></HelpdeskLayout></HelpdeskProvider>} />
+            <Route path="/terceros" element={<HelpdeskProvider><HelpdeskLayout titulo="Clientes" color="bg-blue-600" mostrarCliente={false}><ProtectedRoute permiso="terceros.ver"><Terceros /></ProtectedRoute></HelpdeskLayout></HelpdeskProvider>} />
+            <Route path="/recursos" element={<HelpdeskProvider><HelpdeskLayout titulo="Todos los Recursos" color="bg-amber-600" mostrarCliente={false}><div><HelpdeskNav /><ProtectedRoute permiso="helpdesk.ver"><RecursosGlobal /></ProtectedRoute></div></HelpdeskLayout></HelpdeskProvider>} />
+            <Route path="/bases-de-datos/*" element={<HelpdeskProvider><BasesDeDatosRoutes /></HelpdeskProvider>} />
           </Routes>
         </DashboardProvider>
       </ApiProvider>

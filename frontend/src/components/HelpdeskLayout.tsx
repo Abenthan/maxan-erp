@@ -7,9 +7,10 @@ interface Props {
   children: ReactNode;
   titulo?: string;
   color?: string;
+  mostrarCliente?: boolean;
 }
 
-export default function HelpdeskLayout({ children, titulo = "Mesa de Ayuda", color = "bg-amber-600" }: Props) {
+export default function HelpdeskLayout({ children, titulo = "Mesa de Ayuda", color = "bg-amber-600", mostrarCliente = true }: Props) {
   const { user, logout } = useAuth();
   const { cliente, clearCliente } = useHelpdesk();
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ export default function HelpdeskLayout({ children, titulo = "Mesa de Ayuda", col
           </Link>
           <span className="text-gray-300 mr-2">|</span>
           <span className="text-sm font-semibold text-gray-600">{titulo}</span>
-          {cliente && (
+          {mostrarCliente && cliente && (
             <>
               <span className="text-gray-300">|</span>
               <span className="text-sm text-amber-700 font-semibold">{cliente.razon_social}</span>

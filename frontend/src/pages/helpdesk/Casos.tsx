@@ -21,11 +21,18 @@ interface Caso {
   categoria_color: string;
   tecnico_nombre: string;
   cliente_nombre: string;
+  cliente_id: number;
   recurso_nombre: string;
   recurso_serial: string;
   recursos: RecursoInfo[];
   fuente: string;
   created_at: string;
+}
+
+interface Tercero {
+  id: number;
+  razon_social: string;
+  numero_documento: string;
 }
 
 export default function Casos() {
@@ -37,18 +44,28 @@ export default function Casos() {
   const [cargando, setCargando] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [soloSinCliente, setSoloSinCliente] = useState(false);
+
+  const [asignarCaso, setAsignarCaso] = useState<Caso | null>(null);
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [clientes, setClientes] = useState<Tercero[]>([]);
+  const [buscandoClientes, setBuscandoClientes] = useState(false);
 
   const cargar = useCallback(() => {
     setCargando(true);
     const params = new URLSearchParams();
     if (filtroEstado) params.set("estado", filtroEstado);
     if (busqueda) params.set("q", busqueda);
-    if (cliente) params.set("cliente_id", String(cliente.id));
+    if (soloSinCliente) {
+      params.set("sin_cliente", "true");
+    } else if (cliente) {
+      params.set("cliente_id", String(cliente.id));
+    }
     api.get<Caso[]>(`/helpdesk/casos?${params}`)
       .then(setCasos)
       .catch(() => {})
       .finally(() => setCargando(false));
-  }, [api, filtroEstado, busqueda, cliente]);
+  }, [api, filtroEstado, busqueda, cliente, soloSinCliente]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -62,6 +79,47 @@ export default function Casos() {
     }
   };
 
+  async function abrirAsignarCliente(e: React.MouseEvent, caso: Caso) {
+    e.stopPropagation();
+    if (cliente) {
+      try {
+        await api.put(`/helpdesk/casos/${caso.id}`, { cliente_id: cliente.id });
+        cargar();
+      } catch (err: any) {
+        alert(err.message || "Error al asignar cliente");
+      }
+      return;
+    }
+    setAsignarCaso(caso);
+    setBusquedaCliente("");
+    setClientes([]);
+  }
+
+  async function buscarClientes(q: string) {
+    setBusquedaCliente(q);
+    if (!q.trim()) { setClientes([]); return; }
+    setBuscandoClientes(true);
+    try {
+      const res = await api.get<Tercero[]>(`/terceros?q=${encodeURIComponent(q)}&tipo=cliente`);
+      setClientes(res);
+    } catch {
+      setClientes([]);
+    } finally {
+      setBuscandoClientes(false);
+    }
+  }
+
+  async function guardarAsignacion(clienteId: number | null) {
+    if (!asignarCaso) return;
+    try {
+      await api.put(`/helpdesk/casos/${asignarCaso.id}`, { cliente_id: clienteId });
+      setAsignarCaso(null);
+      cargar();
+    } catch (e: any) {
+      alert(e.message || "Error al asignar cliente");
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
@@ -73,7 +131,7 @@ export default function Casos() {
         )}
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 items-center">
         <input
           className="flex-1 border rounded-lg px-4 py-2.5 text-sm"
           placeholder="Buscar por título, número o cliente..."
@@ -91,6 +149,11 @@ export default function Casos() {
           <option value="Completado">Completado</option>
           <option value="Cancelado">Cancelado</option>
         </select>
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+          <input type="checkbox" checked={soloSinCliente} onChange={(e) => setSoloSinCliente(e.target.checked)}
+            className="rounded border-gray-300" />
+          Sin cliente
+        </label>
       </div>
 
       {cargando ? (
@@ -117,10 +180,19 @@ export default function Casos() {
               {casos.map((c) => {
                 const res = c.recursos || [];
                 return (
-                  <tr key={c.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/helpdesk/casos/${c.id}`)}>
+                  <tr key={c.id} className="border-b hover:bg-gray-50" onClick={() => navigate(`/helpdesk/casos/${c.id}`)}>
                     <td className="p-3 font-mono text-xs text-gray-500">{c.numero}</td>
                     <td className="p-3 font-medium">{c.titulo}</td>
-                    <td className="p-3 text-gray-600">{c.cliente_nombre || "-"}</td>
+                    <td className="p-3">
+                      {puedeGestionar ? (
+                        <button type="button" onClick={(e) => abrirAsignarCliente(e, c)}
+                          className="text-left text-gray-600 hover:text-amber-700 underline decoration-dotted cursor-pointer">
+                          {c.cliente_nombre || <span className="text-gray-400 italic">Sin cliente</span>}
+                        </button>
+                      ) : (
+                        <span className="text-gray-600">{c.cliente_nombre || "-"}</span>
+                      )}
+                    </td>
                     <td className="p-3">
                       {res.length === 0 ? (
                         <span className="text-gray-400">-</span>
@@ -157,6 +229,54 @@ export default function Casos() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {asignarCaso && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setAsignarCaso(null)}>
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">Asignar cliente</h3>
+            <p className="text-sm text-gray-500 mb-4">Caso {asignarCaso.numero}: <span className="font-medium">{asignarCaso.titulo}</span></p>
+
+            <input
+              className="w-full border rounded-lg px-3 py-2 text-sm mb-3"
+              placeholder="Buscar cliente por nombre o NIT..."
+              value={busquedaCliente}
+              onChange={(e) => buscarClientes(e.target.value)}
+              autoFocus
+            />
+
+            {buscandoClientes && <p className="text-sm text-gray-400">Buscando...</p>}
+
+            {clientes.length > 0 && (
+              <div className="max-h-48 overflow-y-auto space-y-1 mb-3 border rounded-lg">
+                {clientes.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => guardarAsignacion(t.id)}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-amber-50 flex items-center justify-between"
+                  >
+                    <span className="font-medium">{t.razon_social}</span>
+                    <span className="text-xs text-gray-400">{t.numero_documento}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              {asignarCaso.cliente_id && (
+                <button type="button" onClick={() => guardarAsignacion(null)}
+                  className="px-3 py-2 text-sm rounded-lg border border-red-300 text-red-700 hover:bg-red-50">
+                  Quitar cliente
+                </button>
+              )}
+              <button type="button" onClick={() => setAsignarCaso(null)}
+                className="px-3 py-2 text-sm text-gray-500 underline">
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

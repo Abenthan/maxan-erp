@@ -43,6 +43,16 @@ const modulos = [
     ruta: "/configuracion/usuarios",
   },
   {
+    id: "bases-datos",
+    titulo: "Bases de Datos",
+    desc: "Administración de terceros, contactos y datos maestros",
+    icono: "🗄️",
+    gradient: "from-teal-500 to-teal-600",
+    bgLight: "bg-teal-50",
+    textColor: "text-teal-700",
+    ruta: "/bases-de-datos/terceros",
+  },
+  {
     id: "crm",
     titulo: "CRM",
     desc: "Gestión de clientes, oportunidades y relaciones comerciales",

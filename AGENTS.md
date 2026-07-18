@@ -61,6 +61,7 @@
 
 ## Frontend módulos (implementados)
 - `pages/Dashboard.tsx` — Página principal `/` con cards de resumen, barras ventas/gastos/clasificación, top clientes, últimas facturas, utilidad por producto. Filtros: mes (select últimos 12 meses), cliente, factura ID.
+- `pages/Contactos.tsx` — CRUD completo de contactos en `/bases-de-datos/contactos`. Tabla con Nombre, Cliente, Teléfono, Email, WhatsApp, Cargo, Estado. Filtros: búsqueda + cliente. Modal edición/creación. Eliminar solo admins (`usuarios.gestionar`).
 - `pages/Productos.tsx` — Listado de catálogo con filtros (búsqueda + categoría), tabla, formulario crear/editar abajo, links a Stock y Gastos
 - `pages/Gastos.tsx` — Listado con filtros (descripción + rango fechas + producto_id por URL), scroll vertical, fila clickeable para editar en modal, Ctrl+G shortcut, quick-create product modal con checkbox inventariable. Clasificación con select dinámico desde `/api/gastos/clasificaciones` + botón ⚙ para administrar (agregar/eliminar) clasificaciones. Default "Administrativo". Cantidad limitada a 2 decimales.
 - `pages/Compras.tsx` — Listado de facturas compra

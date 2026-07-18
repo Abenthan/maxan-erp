@@ -2,16 +2,19 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../../context/ApiContext";
 import { useHelpdesk } from "../../context/HelpdeskContext";
+import { usePermiso } from "../../context/AuthContext";
 
 interface Tercero { id: number; razon_social: string; numero_documento: string; }
 interface Recurso { id: number; nombre: string; serial: string; tipo: string; }
 interface Usuario { id: number; nombres: string; apellidos: string; }
 interface CategoriaCaso { id: number; nombre: string; color: string; }
+interface Contacto { id: number; nombre: string; telefono: string; email: string; whatsapp: string; cargo: string; }
 
 export default function CasoNuevo() {
   const api = useApi();
   const navigate = useNavigate();
   const { cliente } = useHelpdesk();
+  const puedeGestionar = usePermiso("helpdesk.casos.gestionar");
   const [guardando, setGuardando] = useState(false);
   const [categorias, setCategorias] = useState<CategoriaCaso[]>([]);
   const [tecnicos, setTecnicos] = useState<Usuario[]>([]);
@@ -26,6 +29,17 @@ export default function CasoNuevo() {
   const [busquedaRecurso, setBusquedaRecurso] = useState("");
   const [mostrarSelectorRecursos, setMostrarSelectorRecursos] = useState(false);
   const selectorRef = useRef<HTMLDivElement>(null);
+
+  const [contactos, setContactos] = useState<Contacto[]>([]);
+  const [mostrarModalCategorias, setMostrarModalCategorias] = useState(false);
+  const [mostrarModalContactos, setMostrarModalContactos] = useState(false);
+
+  const [nuevaCategoria, setNuevaCategoria] = useState("");
+  const [nuevoColor, setNuevoColor] = useState("#6B7280");
+  const [guardandoCat, setGuardandoCat] = useState(false);
+
+  const [nuevoContacto, setNuevoContacto] = useState({ nombre: "", telefono: "", email: "", whatsapp: "", cargo: "" });
+  const [guardandoContacto, setGuardandoContacto] = useState(false);
 
   useEffect(() => {
     api.get<CategoriaCaso[]>("/helpdesk/categorias-caso").then(setCategorias).catch(() => {});
@@ -45,6 +59,13 @@ export default function CasoNuevo() {
     if (!clienteId) { setRecursosDisponibles([]); return; }
     api.get<Recurso[]>(`/helpdesk/recursos?cliente_id=${clienteId}`)
       .then(setRecursosDisponibles)
+      .catch(() => {});
+  }, [api, clienteId]);
+
+  useEffect(() => {
+    if (!clienteId) { setContactos([]); return; }
+    api.get<Contacto[]>(`/generales/contactos?cliente_id=${clienteId}`)
+      .then(setContactos)
       .catch(() => {});
   }, [api, clienteId]);
 
@@ -96,6 +117,59 @@ export default function CasoNuevo() {
     }
   }
 
+  async function agregarCategoria() {
+    if (!nuevaCategoria.trim()) return;
+    setGuardandoCat(true);
+    try {
+      const c = await api.post<CategoriaCaso>("/helpdesk/categorias-caso", { nombre: nuevaCategoria, color: nuevoColor });
+      setCategorias((prev) => [...prev, c]);
+      setNuevaCategoria("");
+    } catch (e: any) {
+      alert(e.message || "Error al crear categoría");
+    } finally {
+      setGuardandoCat(false);
+    }
+  }
+
+  async function eliminarCategoria(id: number) {
+    if (!confirm("¿Eliminar esta categoría?")) return;
+    try {
+      await api.del(`/helpdesk/categorias-caso/${id}`);
+      setCategorias((prev) => prev.filter((c) => c.id !== id));
+      if (form.categoria_id === String(id)) setField("categoria_id", "");
+    } catch (e: any) {
+      alert(e.message || "Error al eliminar");
+    }
+  }
+
+  async function agregarContacto() {
+    if (!nuevoContacto.nombre.trim() || !clienteId) return;
+    setGuardandoContacto(true);
+    try {
+      const c = await api.post<Contacto>("/generales/contactos", {
+        cliente_id: clienteId,
+        ...nuevoContacto,
+      });
+      setContactos((prev) => [...prev, c]);
+      setNuevoContacto({ nombre: "", telefono: "", email: "", whatsapp: "", cargo: "" });
+    } catch (e: any) {
+      alert(e.message || "Error al crear contacto");
+    } finally {
+      setGuardandoContacto(false);
+    }
+  }
+
+  async function eliminarContacto(id: number) {
+    if (!confirm("¿Eliminar este contacto?")) return;
+    try {
+      await api.del(`/generales/contactos/${id}`);
+      setContactos((prev) => prev.filter((c) => c.id !== id));
+      if (form.contacto_id === String(id)) setField("contacto_id", "");
+    } catch (e: any) {
+      alert(e.message || "Error al eliminar contacto");
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <button onClick={() => navigate("/helpdesk/casos")} className="text-sm text-gray-400 hover:text-gray-600 mb-4 block">← Volver a casos</button>
@@ -115,12 +189,42 @@ export default function CasoNuevo() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
-            <select value={form.categoria_id} onChange={(e) => setField("categoria_id", e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg">
-              <option value="">Sin categoría</option>
-              {categorias.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select value={form.categoria_id} onChange={(e) => setField("categoria_id", e.target.value)} className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg">
+                <option value="">Sin categoría</option>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </select>
+              {puedeGestionar && (
+                <button type="button" onClick={() => setMostrarModalCategorias(true)}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500"
+                  title="Administrar categorías">⚙</button>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Contacto</label>
+            {!clienteId ? (
+              <div className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-400">
+                Selecciona un cliente primero
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select value={form.contacto_id} onChange={(e) => setField("contacto_id", e.target.value)} className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg">
+                  <option value="">Sin contacto</option>
+                  {contactos.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}{c.telefono ? ` (${c.telefono})` : ""}</option>
+                  ))}
+                </select>
+                {puedeGestionar && (
+                  <button type="button" onClick={() => setMostrarModalContactos(true)}
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500"
+                    title="Administrar contactos">⚙</button>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
@@ -214,6 +318,97 @@ export default function CasoNuevo() {
           </button>
         </div>
       </form>
+
+      {/* Modal Categorías */}
+      {mostrarModalCategorias && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setMostrarModalCategorias(false)}>
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Administrar Categorías</h2>
+              <button onClick={() => setMostrarModalCategorias(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div className="space-y-2 mb-4">
+              {categorias.length === 0 ? (
+                <p className="text-sm text-gray-400">Sin categorías</p>
+              ) : (
+                categorias.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: c.color }} />
+                      <span className="text-sm font-medium">{c.nombre}</span>
+                    </div>
+                    <button type="button" onClick={() => eliminarCategoria(c.id)} className="text-xs text-red-500 hover:text-red-700">Eliminar</button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex gap-2 pt-3 border-t">
+              <input
+                className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                placeholder="Nueva categoría..."
+                value={nuevaCategoria}
+                onChange={(e) => setNuevaCategoria(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && agregarCategoria()}
+              />
+              <input
+                type="color"
+                value={nuevoColor}
+                onChange={(e) => setNuevoColor(e.target.value)}
+                className="w-10 h-10 p-1 border rounded cursor-pointer"
+              />
+              <button type="button" onClick={agregarCategoria} disabled={guardandoCat || !nuevaCategoria.trim()} className="px-4 py-2 text-sm rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 disabled:opacity-50">
+                Agregar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Contactos */}
+      {mostrarModalContactos && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setMostrarModalContactos(false)}>
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Administrar Contactos</h2>
+              <button onClick={() => setMostrarModalContactos(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+
+            <div className="space-y-2 mb-4">
+              {contactos.length === 0 ? (
+                <p className="text-sm text-gray-400">No hay contactos para este cliente</p>
+              ) : (
+                contactos.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                    <div>
+                      <span className="text-sm font-medium">{c.nombre}</span>
+                      {c.cargo && <span className="text-xs text-gray-400 ml-2">({c.cargo})</span>}
+                      {c.telefono && <span className="text-xs text-gray-400 ml-2">{c.telefono}</span>}
+                    </div>
+                    <button type="button" onClick={() => eliminarContacto(c.id)} className="text-xs text-red-500 hover:text-red-700">Eliminar</button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex gap-2 pt-3 border-t">
+              <input
+                className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                placeholder="Nombre del contacto..."
+                value={nuevoContacto.nombre}
+                onChange={(e) => setNuevoContacto({ ...nuevoContacto, nombre: e.target.value })}
+              />
+              <input
+                className="w-28 border rounded-lg px-3 py-2 text-sm"
+                placeholder="Teléfono"
+                value={nuevoContacto.telefono}
+                onChange={(e) => setNuevoContacto({ ...nuevoContacto, telefono: e.target.value })}
+              />
+              <button type="button" onClick={agregarContacto} disabled={guardandoContacto || !nuevoContacto.nombre.trim()} className="px-4 py-2 text-sm rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 disabled:opacity-50">
+                Agregar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

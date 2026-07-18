@@ -59,7 +59,7 @@ export default function CasoDetalle() {
   const [tecnicos, setTecnicos] = useState<Usuario[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [form, setForm] = useState({
-    titulo: "", descripcion: "", categoria_id: "", tecnico_id: "", contacto_id: "",
+    titulo: "", descripcion: "", categoria_id: "", tecnico_id: "", contacto_id: "", created_at: "",
   });
 
   useEffect(() => {
@@ -80,6 +80,7 @@ export default function CasoDetalle() {
       categoria_id: caso.categoria_id?.toString() || "",
       tecnico_id: caso.tecnico_id?.toString() || "",
       contacto_id: caso.contacto_id?.toString() || "",
+      created_at: caso.created_at ? new Date(caso.created_at).toISOString().slice(0, 16) : "",
     });
     api.get<CategoriaCaso[]>("/helpdesk/categorias-caso").then(setCategorias).catch(() => {});
     api.get<Usuario[]>("/usuarios").then(setTecnicos).catch(() => {});
@@ -99,6 +100,8 @@ export default function CasoDetalle() {
         categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
         tecnico_id: form.tecnico_id ? Number(form.tecnico_id) : null,
         contacto_id: form.contacto_id ? Number(form.contacto_id) : null,
+        cliente_id: caso.cliente_id,
+        created_at: form.created_at || null,
       });
       const updated = await api.get<Caso>(`/helpdesk/casos/${id}`);
       setCaso(updated);
@@ -278,6 +281,11 @@ export default function CasoDetalle() {
                     <option key={c.id} value={c.id}>{c.nombre}{c.telefono ? ` (${c.telefono})` : ""}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Fecha de creación</label>
+                <input type="datetime-local" value={form.created_at} onChange={(e) => setForm({...form, created_at: e.target.value})}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
               </div>
             </div>
             <div className="flex gap-3 pt-2">

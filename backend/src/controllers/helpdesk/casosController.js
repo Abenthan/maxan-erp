@@ -1,7 +1,7 @@
 const db = (req) => req.app.locals.pool;
 
 exports.listar = async (req, res) => {
-  const { estado, categoria_id, recurso_id, cliente_id, tecnico_id, q } = req.query;
+  const { estado, categoria_id, recurso_id, cliente_id, tecnico_id, q, sin_cliente } = req.query;
   let sql = `SELECT c.*, cat.nombre AS categoria_nombre, cat.color AS categoria_color,
              u.nombres || ' ' || u.apellidos AS tecnico_nombre,
              t.razon_social AS cliente_nombre,
@@ -24,6 +24,7 @@ exports.listar = async (req, res) => {
   if (cliente_id) { params.push(cliente_id); sql += ` AND c.cliente_id = $${params.length}`; }
   if (tecnico_id) { params.push(tecnico_id); sql += ` AND c.tecnico_id = $${params.length}`; }
   if (q) { params.push(`%${q}%`); sql += ` AND (c.titulo ILIKE $${params.length} OR c.numero ILIKE $${params.length} OR t.razon_social ILIKE $${params.length})`; }
+  if (sin_cliente === "true") { sql += " AND c.cliente_id IS NULL"; }
   sql += " ORDER BY c.created_at DESC";
   try {
     const result = await db(req).query(sql, params);
@@ -92,25 +93,34 @@ exports.crear = async (req, res) => {
   }
 };
 
+
 exports.actualizar = async (req, res) => {
-  const { titulo, descripcion, categoria_id, recurso_ids, cliente_id, contacto_id, tecnico_id, estado, solucion, resumen, ai_report } = req.body;
+  const camposPermitidos = ["titulo", "descripcion", "categoria_id", "cliente_id", "contacto_id", "tecnico_id", "estado", "solucion", "resumen", "ai_report", "created_at"];
+  const sets = [];
+  const params = [];
+  let idx = 1;
+  for (const campo of camposPermitidos) {
+    if (req.body[campo] !== undefined) {
+      sets.push(`${campo}=$${idx++}`);
+      params.push(req.body[campo]);
+    }
+  }
+  if (sets.length === 0) return res.status(400).json({ error: "No hay campos para actualizar" });
+  params.push(req.params.id);
   const client = await db(req).connect();
   try {
     await client.query("BEGIN");
     const result = await client.query(
-      `UPDATE helpdesk.casos SET
-        titulo=$1, descripcion=$2, categoria_id=$3, cliente_id=$4,
-        contacto_id=$5, tecnico_id=$6, estado=$7, solucion=$8, resumen=$9, ai_report=$10
-       WHERE id=$11 RETURNING *`,
-      [titulo, descripcion, categoria_id, cliente_id, contacto_id, tecnico_id, estado, solucion, resumen, ai_report, req.params.id]
+      `UPDATE helpdesk.casos SET ${sets.join(", ")} WHERE id=$${idx} RETURNING *`,
+      params
     );
     if (result.rows.length === 0) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "Caso no encontrado" });
     }
-    if (recurso_ids && Array.isArray(recurso_ids)) {
+    if (req.body.recurso_ids && Array.isArray(req.body.recurso_ids)) {
       await client.query("DELETE FROM helpdesk.casos_recursos WHERE caso_id = $1", [req.params.id]);
-      for (const rid of recurso_ids) {
+      for (const rid of req.body.recurso_ids) {
         await client.query(
           `INSERT INTO helpdesk.casos_recursos (caso_id, recurso_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
           [req.params.id, rid]
