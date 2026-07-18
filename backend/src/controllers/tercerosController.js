@@ -12,7 +12,7 @@ async function list(req, res) {
     let idx = 1;
 
     if (q) {
-      sql += ` AND (razon_social ILIKE $${idx} OR numero_documento ILIKE $${idx})`;
+      sql += ` AND (razon_social ILIKE $${idx} OR (numero_documento IS NOT NULL AND numero_documento::text ILIKE $${idx}))`;
       params.push(`%${q}%`);
       idx++;
     }
@@ -58,39 +58,54 @@ async function create(req, res) {
     es_cliente, es_proveedor,
   } = req.body;
 
-  if (!tipo_documento || !numero_documento || !razon_social) {
-    return res.status(400).json({ error: "tipo_documento, numero_documento y razon_social son obligatorios" });
-  }
+    if (!razon_social) {
+      return res.status(400).json({ error: "razon_social es obligatorio" });
+    }
 
-  try {
-    const result = await pool.query(
-      `INSERT INTO facturacion.terceros
-        (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
-         razon_social, direccion, codigo_ciudad, ciudad, codigo_departamento,
-         departamento, codigo_postal, pais, telefono, email, es_propio,
-         es_cliente, es_proveedor)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-       ON CONFLICT (tipo_documento, numero_documento)
-       DO UPDATE SET
-         razon_social = EXCLUDED.razon_social,
-         direccion = EXCLUDED.direccion,
-         ciudad = EXCLUDED.ciudad,
-         departamento = EXCLUDED.departamento,
-         telefono = EXCLUDED.telefono,
-         email = EXCLUDED.email,
-         es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE facturacion.terceros.es_cliente END,
-         es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE facturacion.terceros.es_proveedor END,
-         updated_at = now()
-       RETURNING *`,
-      [
-        tipo_documento, numero_documento, digito_verificacion || null, tipo_persona || null,
+    const tieneDoc = tipo_documento && numero_documento;
+
+    try {
+      let queryText;
+
+      if (tieneDoc) {
+        queryText = `INSERT INTO facturacion.terceros
+          (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
+           razon_social, direccion, codigo_ciudad, ciudad, codigo_departamento,
+           departamento, codigo_postal, pais, telefono, email, es_propio,
+           es_cliente, es_proveedor)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         ON CONFLICT (tipo_documento, numero_documento) WHERE tipo_documento IS NOT NULL AND numero_documento IS NOT NULL
+         DO UPDATE SET
+           razon_social = EXCLUDED.razon_social,
+           direccion = EXCLUDED.direccion,
+           ciudad = EXCLUDED.ciudad,
+           departamento = EXCLUDED.departamento,
+           telefono = EXCLUDED.telefono,
+           email = EXCLUDED.email,
+           es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE facturacion.terceros.es_cliente END,
+           es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE facturacion.terceros.es_proveedor END,
+           updated_at = now()
+       RETURNING *`;
+      } else {
+        queryText = `INSERT INTO facturacion.terceros
+          (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
+           razon_social, direccion, codigo_ciudad, ciudad, codigo_departamento,
+           departamento, codigo_postal, pais, telefono, email, es_propio,
+           es_cliente, es_proveedor)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         RETURNING *`;
+      }
+
+      const queryParams = [
+        tipo_documento || null, numero_documento || null, digito_verificacion || null, tipo_persona || null,
         razon_social, direccion || null, codigo_ciudad || null, ciudad || null,
         codigo_departamento || null, departamento || null, codigo_postal || null,
         pais || "CO", telefono || null, email || null, es_propio || false,
         es_cliente ?? false, es_proveedor ?? false,
-      ]
-    );
-    res.status(201).json(result.rows[0]);
+      ];
+
+      const result = await pool.query(queryText, queryParams);
+      res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error("Error al crear tercero:", error.message);
     res.status(500).json({ error: error.message });

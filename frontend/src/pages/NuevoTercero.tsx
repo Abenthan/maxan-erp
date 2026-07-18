@@ -30,7 +30,7 @@ export default function NuevoTercero() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.razon_social.trim() || !form.numero_documento.trim()) return;
+    if (!form.razon_social.trim()) return;
     setGuardando(true);
     setError("");
     try {
@@ -69,21 +69,20 @@ export default function NuevoTercero() {
                 onChange={(e) => setField("tipo_documento", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
               >
+                <option value="">S/I (Sin Identificación)</option>
                 <option value="13">Cédula (CC)</option>
                 <option value="31">NIT</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Número *</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Número</label>
               <input
                 type="text"
                 value={form.numero_documento}
                 onChange={(e) => setField("numero_documento", e.target.value)}
-                required
                 placeholder="123456789"
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
           </div>
 
           <div>

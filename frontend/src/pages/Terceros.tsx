@@ -83,7 +83,7 @@ export default function Terceros() {
 
   async function guardarCambios(e: React.FormEvent) {
     e.preventDefault();
-    if (!editForm.razon_social?.trim() || !editForm.numero_documento?.trim()) return;
+    if (!editForm.razon_social?.trim()) return;
     setGuardando(true);
     setError("");
     try {
@@ -197,11 +197,16 @@ export default function Terceros() {
                       </div>
                     </td>
                     <td className="p-3 whitespace-nowrap">
-                      <span className="text-xs text-gray-500 font-medium">
-                        {t.tipo_documento === "13" ? "CC" : t.tipo_documento === "31" ? "NIT" : t.tipo_documento}
-                      </span>
-                      <span className="ml-1 font-mono text-gray-800">{t.numero_documento}{t.digito_verificacion ? `-${t.digito_verificacion}` : ""}</span>
-                    </td>
+                      {t.tipo_documento && t.numero_documento ? (
+                        <>
+                          <span className="text-xs text-gray-500 font-medium">
+                            {t.tipo_documento === "13" ? "CC" : t.tipo_documento === "31" ? "NIT" : t.tipo_documento}
+                          </span>
+                          <span className="ml-1 font-mono text-gray-800">{t.numero_documento}{t.digito_verificacion ? `-${t.digito_verificacion}` : ""}</span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">S/I</span>
+                      )}
                     <td className="p-3 font-medium text-gray-900">{t.razon_social}</td>
                     <td className="p-3">
                       <div className="flex gap-1">
@@ -260,17 +265,17 @@ export default function Terceros() {
                     onChange={(e) => setEditForm({ ...editForm, tipo_documento: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="">S/I (Sin Identificación)</option>
                     <option value="13">CC</option>
                     <option value="31">NIT</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Número *</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Número</label>
                   <input
                     type="text"
                     value={editForm.numero_documento || ""}
                     onChange={(e) => setEditForm({ ...editForm, numero_documento: e.target.value })}
-                    required
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>

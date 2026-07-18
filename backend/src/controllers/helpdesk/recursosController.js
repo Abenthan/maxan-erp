@@ -154,7 +154,8 @@ exports.obtenerPendiente = async (req, res) => {
 };
 
 exports.scriptPS = async (req, res) => {
-  const serverUrl = `${req.protocol}://${req.get('host')}`;
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const serverUrl = `${proto}://${req.get('host')}`;
   const clienteId = req.query.cliente_id ? Number(req.query.cliente_id) : null;
   const sessionCode = req.query.session || "";
 

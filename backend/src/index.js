@@ -37,6 +37,7 @@ const helpdeskTiposDetalleRouter = require("./routes/helpdesk/tiposDetalle");
 const backupRouter = require("./routes/backup");
 
 const app = express();
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 3000;
 
 const pool = new Pool({
