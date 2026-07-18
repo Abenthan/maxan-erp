@@ -113,7 +113,7 @@ export default function CasoDetalle() {
         categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
         tecnico_id: form.tecnico_id ? Number(form.tecnico_id) : null,
         contacto_id: form.contacto_id ? Number(form.contacto_id) : null,
-        cliente_id: caso.cliente_id,
+        cliente_id: caso?.cliente_id ?? null,
         created_at: form.created_at || null,
       });
       const updated = await api.get<Caso>(`/helpdesk/casos/${id}`);
