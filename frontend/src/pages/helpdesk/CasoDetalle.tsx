@@ -6,10 +6,12 @@ import { usePermiso } from "../../context/AuthContext";
 interface Caso {
   id: number; numero: string; titulo: string; descripcion: string;
   estado: string; categoria_nombre: string; categoria_color: string;
-  tecnico_nombre: string; cliente_nombre: string; cliente_documento: string; cliente_id: number;
+  categoria_id: number;
+  tecnico_nombre: string; tecnico_id: number;
+  cliente_nombre: string; cliente_documento: string; cliente_id: number;
   recurso_nombre: string; recurso_serial: string;
   recursos: { id: number; nombre: string; serial: string; tipo: string; marca: string; modelo: string }[];
-  contacto_nombre: string; contacto_telefono: string; contacto_whatsapp: string;
+  contacto_nombre: string; contacto_telefono: string; contacto_whatsapp: string; contacto_id: number;
   fuente: string; solucion: string; resumen: string; ai_report: string;
   created_at: string; updated_at: string;
 }
@@ -20,6 +22,18 @@ interface Detalle {
 
 interface Recurso {
   id: number; nombre: string; serial: string; tipo: string; marca: string; modelo: string;
+}
+
+interface CategoriaCaso {
+  id: number; nombre: string; color: string;
+}
+
+interface Usuario {
+  id: number; nombres: string; apellidos: string;
+}
+
+interface Contacto {
+  id: number; nombre: string; telefono: string;
 }
 
 export default function CasoDetalle() {
@@ -40,6 +54,14 @@ export default function CasoDetalle() {
   const [recursosDisponibles, setRecursosDisponibles] = useState<Recurso[]>([]);
   const [busquedaRecurso, setBusquedaRecurso] = useState("");
 
+  const [editando, setEditando] = useState(false);
+  const [categorias, setCategorias] = useState<CategoriaCaso[]>([]);
+  const [tecnicos, setTecnicos] = useState<Usuario[]>([]);
+  const [contactos, setContactos] = useState<Contacto[]>([]);
+  const [form, setForm] = useState({
+    titulo: "", descripcion: "", categoria_id: "", tecnico_id: "", contacto_id: "",
+  });
+
   useEffect(() => {
     Promise.all([
       api.get<Caso>(`/helpdesk/casos/${id}`),
@@ -50,6 +72,43 @@ export default function CasoDetalle() {
       .finally(() => setCargando(false));
   }, [id, api, navigate]);
 
+  function iniciarEdicion() {
+    if (!caso) return;
+    setForm({
+      titulo: caso.titulo || "",
+      descripcion: caso.descripcion || "",
+      categoria_id: caso.categoria_id?.toString() || "",
+      tecnico_id: caso.tecnico_id?.toString() || "",
+      contacto_id: caso.contacto_id?.toString() || "",
+    });
+    api.get<CategoriaCaso[]>("/helpdesk/categorias-caso").then(setCategorias).catch(() => {});
+    api.get<Usuario[]>("/usuarios").then(setTecnicos).catch(() => {});
+    if (caso.cliente_id) {
+      api.get<Contacto[]>(`/generales/contactos?cliente_id=${caso.cliente_id}`).then(setContactos).catch(() => {});
+    }
+    setEditando(true);
+  }
+
+  async function guardarEdicion() {
+    if (!form.titulo.trim()) return alert("El título es obligatorio");
+    setGuardando(true);
+    try {
+      await api.put(`/helpdesk/casos/${id}`, {
+        titulo: form.titulo,
+        descripcion: form.descripcion,
+        categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
+        tecnico_id: form.tecnico_id ? Number(form.tecnico_id) : null,
+        contacto_id: form.contacto_id ? Number(form.contacto_id) : null,
+      });
+      const updated = await api.get<Caso>(`/helpdesk/casos/${id}`);
+      setCaso(updated);
+      setEditando(false);
+    } catch (e: any) {
+      alert(e.message || "Error al guardar cambios");
+    } finally {
+      setGuardando(false);
+    }
+  }
   async function abrirVinculador() {
     setMostrarVinculador(true);
     setBusquedaRecurso("");
@@ -61,6 +120,8 @@ export default function CasoDetalle() {
       setRecursosDisponibles([]);
     }
   }
+
+  const puedeEditar = puedeGestionar && caso?.estado !== "Completado" && caso?.estado !== "Cancelado";
 
   async function vincularRecurso(recursoId: number) {
     setGuardando(true);
@@ -166,51 +227,112 @@ export default function CasoDetalle() {
               )}
               <span className="text-xs text-gray-400">{caso.fuente}</span>
             </div>
-            <h2 className="text-xl font-bold text-gray-900">{caso.titulo}</h2>
-          </div>
-        </div>
-
-        {caso.descripcion && <p className="text-sm text-gray-600 mb-4 whitespace-pre-wrap">{caso.descripcion}</p>}
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          {caso.cliente_nombre && (
-            <div><span className="text-gray-400 text-xs block">Cliente</span><span className="font-medium">{caso.cliente_nombre}</span></div>
-          )}
-          <div>
-            <span className="text-gray-400 text-xs block">Recursos</span>
-            {recursos.length === 0 ? (
-              <span className="text-gray-400">Ninguno</span>
+            {editando ? (
+              <input type="text" value={form.titulo} onChange={(e) => setForm({...form, titulo: e.target.value})}
+                className="w-full text-xl font-bold text-gray-900 border border-amber-300 rounded-lg px-3 py-2 mt-1" />
             ) : (
-              <div className="flex flex-wrap gap-1 mt-0.5">
-                {recursos.map((r) => (
-                  <span key={r.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
-                    {r.nombre}
-                    {r.serial && <span className="text-gray-400 font-mono">({r.serial})</span>}
-                    {puedeGestionar && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); desvincularRecurso(r.id); }}
-                        className="hover:text-red-500 ml-0.5"
-                        title="Desvincular"
-                      >✕</button>
-                    )}
-                  </span>
-                ))}
-              </div>
-            )}
-            {puedeGestionar && (
-              <button type="button" onClick={abrirVinculador} className="text-xs text-amber-600 hover:text-amber-800 mt-1">
-                + Vincular recurso
-              </button>
+              <h2 className="text-xl font-bold text-gray-900">{caso.titulo}</h2>
             )}
           </div>
-          {caso.tecnico_nombre && (
-            <div><span className="text-gray-400 text-xs block">Técnico</span><span className="font-medium">{caso.tecnico_nombre}</span></div>
-          )}
-          {caso.contacto_nombre && (
-            <div><span className="text-gray-400 text-xs block">Contacto</span><span className="font-medium">{caso.contacto_nombre}</span></div>
+          {puedeEditar && !editando && (
+            <button onClick={iniciarEdicion} className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700">
+              Editar
+            </button>
           )}
         </div>
+
+        {editando ? (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Descripción</label>
+              <textarea value={form.descripcion} onChange={(e) => setForm({...form, descripcion: e.target.value})}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" rows={3} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
+                <select value={form.categoria_id} onChange={(e) => setForm({...form, categoria_id: e.target.value})}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg">
+                  <option value="">Sin categoría</option>
+                  {categorias.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Técnico asignado</label>
+                <select value={form.tecnico_id} onChange={(e) => setForm({...form, tecnico_id: e.target.value})}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg">
+                  <option value="">Sin asignar</option>
+                  {tecnicos.map((u) => (
+                    <option key={u.id} value={u.id}>{u.nombres} {u.apellidos}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Contacto</label>
+                <select value={form.contacto_id} onChange={(e) => setForm({...form, contacto_id: e.target.value})}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg">
+                  <option value="">Sin contacto</option>
+                  {contactos.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}{c.telefono ? ` (${c.telefono})` : ""}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={guardarEdicion} disabled={guardando}
+                className="bg-amber-600 text-white px-6 py-2.5 rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50">
+                {guardando ? "Guardando..." : "Guardar cambios"}
+              </button>
+              <button onClick={() => setEditando(false)} className="text-gray-500 text-sm underline">Cancelar</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {caso.descripcion && <p className="text-sm text-gray-600 mb-4 whitespace-pre-wrap">{caso.descripcion}</p>}
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              {caso.cliente_nombre && (
+                <div><span className="text-gray-400 text-xs block">Cliente</span><span className="font-medium">{caso.cliente_nombre}</span></div>
+              )}
+              <div>
+                <span className="text-gray-400 text-xs block">Recursos</span>
+                {recursos.length === 0 ? (
+                  <span className="text-gray-400">Ninguno</span>
+                ) : (
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {recursos.map((r) => (
+                      <span key={r.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
+                        {r.nombre}
+                        {r.serial && <span className="text-gray-400 font-mono">({r.serial})</span>}
+                        {puedeGestionar && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); desvincularRecurso(r.id); }}
+                            className="hover:text-red-500 ml-0.5"
+                            title="Desvincular"
+                          >✕</button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {puedeGestionar && (
+                  <button type="button" onClick={abrirVinculador} className="text-xs text-amber-600 hover:text-amber-800 mt-1">
+                    + Vincular recurso
+                  </button>
+                )}
+              </div>
+              {caso.tecnico_nombre && (
+                <div><span className="text-gray-400 text-xs block">Técnico</span><span className="font-medium">{caso.tecnico_nombre}</span></div>
+              )}
+              {caso.contacto_nombre && (
+                <div><span className="text-gray-400 text-xs block">Contacto</span><span className="font-medium">{caso.contacto_nombre}</span></div>
+              )}
+            </div>
+          </>
+        )}
 
         {mostrarVinculador && (
           <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">

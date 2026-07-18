@@ -51,7 +51,7 @@ exports.obtener = async (req, res) => {
        LEFT JOIN helpdesk.categorias_caso cat ON cat.id = c.categoria_id
        LEFT JOIN usuarios.usuarios u ON u.id = c.tecnico_id
        LEFT JOIN facturacion.terceros t ON t.id = c.cliente_id
-       LEFT JOIN helpdesk.contactos con ON con.id = c.contacto_id
+       LEFT JOIN generales.contactos con ON con.id = c.contacto_id
        WHERE c.id = $1`,
       [req.params.id]
     );

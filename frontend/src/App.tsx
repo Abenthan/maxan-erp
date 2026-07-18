@@ -120,7 +120,7 @@ function HelpdeskRoutes() {
   return (
     <HelpdeskLayout>
       <div>
-        {cliente && <HelpdeskNav />}
+        <HelpdeskNav />
         <Routes>
           <Route path="/" element={
             <ProtectedRoute permiso="helpdesk.ver">
@@ -196,7 +196,7 @@ function App() {
             <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
             <Route path="/nuevo-tercero" element={<ProtectedRoute permiso="terceros.gestionar"><NuevoTercero /></ProtectedRoute>} />
             <Route path="/terceros" element={<HelpdeskProvider><HelpdeskLayout titulo="Clientes" color="bg-blue-600"><ProtectedRoute permiso="terceros.ver"><Terceros /></ProtectedRoute></HelpdeskLayout></HelpdeskProvider>} />
-            <Route path="/recursos" element={<HelpdeskProvider><HelpdeskLayout titulo="Todos los Recursos" color="bg-amber-600"><ProtectedRoute permiso="helpdesk.ver"><RecursosGlobal /></ProtectedRoute></HelpdeskLayout></HelpdeskProvider>} />
+            <Route path="/recursos" element={<HelpdeskProvider><HelpdeskLayout titulo="Todos los Recursos" color="bg-amber-600"><div><HelpdeskNav /><ProtectedRoute permiso="helpdesk.ver"><RecursosGlobal /></ProtectedRoute></div></HelpdeskLayout></HelpdeskProvider>} />
           </Routes>
         </DashboardProvider>
       </ApiProvider>

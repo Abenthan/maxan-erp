@@ -141,9 +141,16 @@
 - Envío: `Authorization: Bearer <token>` en cada request vía interceptor de axios
 
 ## Schemas SQL
-- `db/init/01_schema.sql` — Schema consolidado (facturacion, compras, inventario, gastos, cartera, usuarios, helpdesk). Se ejecuta automáticamente al crear el contenedor PostgreSQL por primera vez via `docker-entrypoint-initdb.d`.
+- `db/init/01_schema.sql` — Schema consolidado (facturacion, compras, inventario, gastos, cartera, usuarios, generales, helpdesk). Se ejecuta automáticamente al crear el contenedor PostgreSQL por primera vez via `docker-entrypoint-initdb.d`.
 - `db/migrar_produccion.sql` — Script para ejecutar en DBeaver contra una BD de producción que se creó antes de tener el schema consolidado. Crea schemas cartera, usuarios, helpdesk y tablas faltantes.
 - Migraciones individuales en `db/`: `01_schema.sql` a `21_casos_recursos.sql` (histórico, todo consolidado en `db/init/01_schema.sql`)
+- `db/migrar_contactos_a_generales.sql` — Migración para mover `helpdesk.contactos` a `generales.contactos` en BD existentes.
+
+## Schema `generales` (tablas compartidas entre módulos)
+- **contactos** — Personas de contacto de clientes (`facturacion.terceros`). FK desde `helpdesk.casos.contacto_id` y `helpdesk.casos_contactos.contacto_id`.
+  - Endpoint: `GET/POST/PUT/DELETE /api/generales/contactos`
+  - Permisos: `helpdesk.casos.ver` (lectura), `helpdesk.casos.gestionar` (escritura)
+  - Anteriormente en `helpdesk.contactos`, migrado a `generales.contactos` para uso cross-module (helpdesk + CRM futuro).
 
 ## Dependencias adicionales
 ### Backend
@@ -192,6 +199,9 @@
 34. **`\restrict` y `\unrestrict` de pg_dump 16** — pg_dump 16 agrega meta-comandos psql `\restrict`/`\unrestrict` que no son SQL válido y causaban syntax error en DBeaver. Solución: filtro stream que remueve líneas que empiezan con `\restrict` o `\unrestrict`.
 35. **POST /api/auth/seed-admin** — endpoint para crear admin inicial en producción (alternativa a `/register`). Crea empresa + usuario admin + asigna rol Administrador. Útil cuando el flujo first-run no está disponible.
 36. **Backend .env DB_PORT corregido** — `backend/.env` tenía `DB_PORT=5433` pero el contenedor PostgreSQL en desarrollo usaba `5432:5432` (no el `5433:5432` del compose). Corregido a `DB_PORT=5432`.
+37. **HelpdeskNav oculto en /recursos** — el nav solo se mostraba cuando `cliente` estaba seleccionado (`{cliente && <HelpdeskNav />}`), pero pestañas como "Todos los Recursos" y "Categorías" no requieren cliente. Solución: cambiar a siempre mostrar `<HelpdeskNav />` (las pestañas ya se filtran internamente).
+38. **CasoDetalle sin modo edición** — no había forma de editar campos del caso (título, descripción, categoría, técnico, contacto). Se agregó botón "Editar" con toggle inline siguiendo el patrón de RecursoDetalle. Guarda vía `PUT /helpdesk/casos/:id`.
+39. **helpdesk.contactos movido a generales.contactos** — la tabla de contactos estaba en `helpdesk` pero es necesaria para CRM y otros módulos. Se creó schema `generales`, se migró la tabla y se actualizaron FKs y rutas. Migración en `db/migrar_contactos_a_generales.sql`.
 
 ## Cálculo de utilidad (`vw_utilidad_productos`)
 - **costo_adquisiciones** = SUM(entradas.cantidad × costo_unitario) — todo lo que entró a inventario (gastos Suministros que generan entrada via trigger)
@@ -298,7 +308,7 @@ docker exec -i maxan_db_dev psql -U maxan_user -d maxan_erp < backup.sql
 - User: maxan_user
 - Pass: dev_password_segura
 - DB: maxan_erp
-- Schema: facturacion, compras, inventario, gastos, cartera, public, helpdesk
+- Schema: facturacion, compras, inventario, gastos, cartera, usuarios, generales, helpdesk, public
 
 ## Notion
 - Token almacenado en `D:\Desarrollos\maxan-erp\.env` como `NOTION_TOKEN`
@@ -348,8 +358,10 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/api/helpdesk/casos/:id/recursos` | GET | `helpdesk.casos.ver` | Listar recursos vinculados al caso |
 | `/api/helpdesk/casos/:id/recursos` | POST | `helpdesk.casos.gestionar` | Vincular recurso(s) al caso (`{ recurso_ids: [1,2] }`) |
 | `/api/helpdesk/casos/:id/recursos/:recurso_id` | DELETE | `helpdesk.casos.gestionar` | Desvincular recurso del caso |
-| `/api/helpdesk/contactos` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | CRUD contactos de clientes |
-| `/api/helpdesk/contactos/:id` | GET/PUT/DELETE | `helpdesk.casos.ver`/`.gestionar` | CRUD contacto individual |
+| `/api/generales/contactos` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | CRUD contactos de clientes (uso cross-module) |
+| `/api/generales/contactos/:id` | GET/PUT/DELETE | `helpdesk.casos.ver`/`.gestionar` | CRUD contacto individual |
+| `/api/helpdesk/contactos` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | CRUD contactos (compatibilidad, tabla en generales) |
+| `/api/helpdesk/contactos/:id` | GET/PUT/DELETE | `helpdesk.casos.ver`/`.gestionar` | CRUD contacto individual (compatibilidad) |
 | `/api/helpdesk/categorias-caso` | GET/POST | `helpdesk.casos.ver`/`.gestionar` | Categorías editables de caso |
 | `/api/helpdesk/categorias-caso/:id` | PUT/DELETE | `helpdesk.casos.gestionar` | Editar/eliminar categoría |
 | `/api/helpdesk/tipos-recurso` | GET | `helpdesk.ver` | Listar tipos de recurso |
@@ -367,7 +379,7 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/helpdesk/obtener-pc` | `RegistrarPC.tsx` | `helpdesk.gestionar` | Detectar PC: script PS + formulario manual. Cliente desde contexto (no dropdown). |
 | `/helpdesk/casos` | `Casos.tsx` | `helpdesk.casos.ver` | Listado de casos con filtros (búsqueda, estado), tabla con #, título, cliente, **recursos**, categoría, técnico, estado. |
 | `/helpdesk/casos/nuevo` | `CasoNuevo.tsx` | `helpdesk.casos.gestionar` | Formulario crear caso: título, descripción, categoría, técnico, cliente con búsqueda, **recursos multiselect** filtrado por cliente. |
-| `/helpdesk/casos/:id` | `CasoDetalle.tsx` | `helpdesk.casos.ver` | Detalle del caso con **recursos vinculados (chips + desvincular)**, bitácora, cambio de estado (Iniciar/Completar/Cancelar), campo de solución al cerrar. Botón "+ Vincular recurso" con selector. |
+| `/helpdesk/casos/:id` | `CasoDetalle.tsx` | `helpdesk.casos.ver` | Detalle del caso con **recursos vinculados (chips + desvincular)**, bitácora, cambio de estado (Iniciar/Completar/Cancelar), campo de solución al cerrar. Botón "+ Vincular recurso" con selector. **Modo edición inline** (título, descripción, categoría, técnico, contacto) con botón "Editar" para usuarios con `helpdesk.casos.gestionar`. |
 | `/helpdesk/categorias-caso` | `CategoriasCaso.tsx` | `helpdesk.casos.gestionar` | Administrar categorías (agregar/eliminar con selector de color). |
 
 ### Permisos (seed automático)

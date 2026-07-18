@@ -893,7 +893,7 @@ JOIN facturacion.ventas v ON v.id = pa.venta_id;
 -- ---------------------------------------------------------------------
 -- 7. search_path
 -- ---------------------------------------------------------------------
-ALTER ROLE maxan_user SET search_path TO facturacion, compras, inventario, gastos, cartera, public;
+ALTER ROLE maxan_user SET search_path TO facturacion, compras, inventario, gastos, cartera, usuarios, generales, helpdesk, public;
 
 
 -- =====================================================================
@@ -1345,9 +1345,13 @@ INSERT INTO helpdesk.categorias_caso (nombre, color) VALUES
 ON CONFLICT (nombre) DO NOTHING;
 
 -- ------------------------------------------------------------------
--- 2. CONTACTOS (personas de contacto de clientes)
+-- 2. SCHEMA GENERALES (tables shared across modules)
 -- ------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS helpdesk.contactos (
+CREATE SCHEMA IF NOT EXISTS generales;
+-- ------------------------------------------------------------------
+-- 3. CONTACTOS (personas de contacto de clientes)
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS generales.contactos (
   id SERIAL PRIMARY KEY,
   cliente_id INTEGER REFERENCES facturacion.terceros(id) ON DELETE CASCADE,
   nombre VARCHAR(200) NOT NULL,
@@ -1360,10 +1364,11 @@ CREATE TABLE IF NOT EXISTS helpdesk.contactos (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-DROP TRIGGER IF EXISTS trg_contactos_updated_at ON helpdesk.contactos;
+DROP TRIGGER IF EXISTS trg_contactos_updated_at ON generales.contactos;
 CREATE TRIGGER trg_contactos_updated_at
-  BEFORE UPDATE ON helpdesk.contactos
+  BEFORE UPDATE ON generales.contactos
   FOR EACH ROW EXECUTE FUNCTION facturacion.fn_set_updated_at();
+
 
 -- ------------------------------------------------------------------
 -- 3. CASOS (tickets de soporte)
@@ -1378,7 +1383,7 @@ CREATE TABLE IF NOT EXISTS helpdesk.casos (
   categoria_id INTEGER REFERENCES helpdesk.categorias_caso(id),
   recurso_id INTEGER REFERENCES helpdesk.recursos(id),
   cliente_id INTEGER REFERENCES facturacion.terceros(id),
-  contacto_id INTEGER REFERENCES helpdesk.contactos(id),
+  contacto_id INTEGER REFERENCES generales.contactos(id),
   tecnico_id INTEGER REFERENCES usuarios.usuarios(id),
   estado VARCHAR(20) DEFAULT 'Pendiente'
     CHECK (estado IN ('Pendiente', 'En Progreso', 'Completado', 'Cancelado')),
@@ -1405,7 +1410,7 @@ CREATE TRIGGER trg_casos_updated_at
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS helpdesk.casos_contactos (
   caso_id INTEGER NOT NULL REFERENCES helpdesk.casos(id) ON DELETE CASCADE,
-  contacto_id INTEGER NOT NULL REFERENCES helpdesk.contactos(id) ON DELETE CASCADE,
+  contacto_id INTEGER NOT NULL REFERENCES generales.contactos(id) ON DELETE CASCADE,
   PRIMARY KEY (caso_id, contacto_id)
 );
 
