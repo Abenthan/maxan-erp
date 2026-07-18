@@ -207,6 +207,7 @@ export default function Terceros() {
                       ) : (
                         <span className="text-xs text-gray-400 italic">S/I</span>
                       )}
+                    </td>
                     <td className="p-3 font-medium text-gray-900">{t.razon_social}</td>
                     <td className="p-3">
                       <div className="flex gap-1">
