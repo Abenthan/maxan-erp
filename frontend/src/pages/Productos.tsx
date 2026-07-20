@@ -142,7 +142,17 @@ export default function Productos() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Productos</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
+        {puedeGestionar && (
+          <Link
+            to="/inventario/nuevo-producto"
+            className="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
+          >
+            + Nuevo Producto
+          </Link>
+        )}
+      </div>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
@@ -182,18 +192,6 @@ export default function Productos() {
             </button>
           )}
         </div>
-      </div>
-
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">{filtrados.length} producto{filtrados.length !== 1 ? "s" : ""}</h2>
-        {puedeGestionar && (
-          <Link
-            to="/inventario/nuevo-producto"
-            className="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
-          >
-            + Nuevo Producto
-          </Link>
-        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">

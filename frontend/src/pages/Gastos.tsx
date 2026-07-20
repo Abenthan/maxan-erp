@@ -19,6 +19,21 @@ interface Clasificacion {
   nombre: string;
 }
 
+interface VentaItemInfo {
+  id: number;
+  venta_id: number;
+  numero_linea: number;
+  descripcion: string;
+  valor_linea: string;
+  producto_id: number | null;
+  numero_completo: string;
+  fecha_emision: string;
+  cufe: string | null;
+  cliente: string;
+  nit_cliente: string;
+  consumido: boolean;
+}
+
 interface Gasto {
   id: number;
   descripcion: string;
@@ -86,6 +101,9 @@ export default function Gestos() {
 
   const [vinculoModalOpen, setVinculoModalOpen] = useState(false);
   const [vinculoGastoId, setVinculoGastoId] = useState<number | null>(null);
+  const [ventaModalGasto, setVentaModalGasto] = useState<Gasto | null>(null);
+  const [ventaItemInfo, setVentaItemInfo] = useState<VentaItemInfo | null>(null);
+  const [loadingVentaInfo, setLoadingVentaInfo] = useState(false);
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -113,6 +131,22 @@ export default function Gestos() {
     setVrUnit("");
     setFecha(new Date().toISOString().slice(0, 10));
     setProductoId("");
+  }
+
+  async function abrirVentaModal(g: Gasto) {
+    setVentaModalGasto(g);
+    setVentaItemInfo(null);
+    if (g.venta_item_id) {
+      setLoadingVentaInfo(true);
+      try {
+        const items = await api.get<VentaItemInfo[]>(`/ventas/items?id=${g.venta_item_id}`);
+        setVentaItemInfo(items[0] || null);
+      } catch {
+        setVentaItemInfo(null);
+      } finally {
+        setLoadingVentaInfo(false);
+      }
+    }
   }
 
   function toggleSort(key: keyof Gasto) {
@@ -388,6 +422,17 @@ export default function Gestos() {
                               }`}
                             >
                               Producto
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); abrirVentaModal(g); }}
+                              className={`px-2.5 py-1.5 text-xs rounded-lg ${
+                                g.venta_item_id
+                                  ? "bg-purple-600 text-white hover:bg-purple-700"
+                                  : "border border-purple-600 text-purple-600 hover:bg-purple-50"
+                              }`}
+                            >
+                              Venta
                             </button>
                           </div>
                         </td>
@@ -686,6 +731,81 @@ export default function Gestos() {
           onClose={() => setVinculoModalOpen(false)}
           onVinculado={() => { setVinculoModalOpen(false); cargar(); }}
         />
+      )}
+
+      {ventaModalGasto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setVentaModalGasto(null)}>
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Información de Venta</h3>
+
+            {!ventaModalGasto.venta_item_id ? (
+              <div className="p-6 text-center text-gray-400">
+                <p className="text-sm">Este gasto no está vinculado a ninguna venta.</p>
+              </div>
+            ) : loadingVentaInfo ? (
+              <div className="p-6 text-center text-gray-400">
+                <p className="text-sm">Cargando información de la venta...</p>
+              </div>
+            ) : !ventaItemInfo ? (
+              <div className="p-6 text-center text-red-500">
+                <p className="text-sm">No se pudo cargar la información de la venta.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Factura</span>
+                    <span className="text-sm font-medium">{String(ventaItemInfo.numero_completo || "")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Cliente</span>
+                    <span className="text-sm font-medium">{String(ventaItemInfo.cliente || "")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">NIT</span>
+                    <span className="text-sm font-medium">{String(ventaItemInfo.nit_cliente || "")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Fecha</span>
+                    <span className="text-sm font-medium">{ventaItemInfo.fecha_emision ? new Date(String(ventaItemInfo.fecha_emision)).toLocaleDateString("es-CO") : ""}</span>
+                  </div>
+                  <hr className="border-purple-200" />
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Línea</span>
+                    <span className="text-sm font-medium">#{String(ventaItemInfo.numero_linea || "")}</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500">Descripción</span>
+                    <p className="text-sm font-medium mt-0.5">{String(ventaItemInfo.descripcion || "")}</p>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Valor</span>
+                    <span className="text-sm font-bold text-purple-700">
+                      {formatCurrency(Number(ventaItemInfo.valor_linea || 0))}
+                    </span>
+                  </div>
+                  {ventaItemInfo.cufe && (
+                    <div className="flex justify-between">
+                      <span className="text-xs text-gray-500">CUFE</span>
+                      <span className="text-xs font-mono text-gray-500 truncate max-w-[200px]" title={String(ventaItemInfo.cufe)}>
+                        {String(ventaItemInfo.cufe).slice(0, 20)}...
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setVentaModalGasto(null)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,7 @@ function getPool(req) {
 
 async function listItems(req, res) {
   const pool = getPool(req);
-  const { venta_id, descripcion, fecha_desde, fecha_hasta } = req.query;
+  const { id, venta_id, descripcion, fecha_desde, fecha_hasta } = req.query;
 
   try {
     let sql = `
@@ -19,6 +19,10 @@ async function listItems(req, res) {
     const params = [];
     let idx = 1;
 
+    if (id) {
+      sql += ` AND vi.id = $${idx++}`;
+      params.push(id);
+    }
     if (venta_id) {
       sql += ` AND vi.venta_id = $${idx++}`;
       params.push(venta_id);
