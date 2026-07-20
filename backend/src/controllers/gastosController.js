@@ -156,53 +156,57 @@ async function getById(req, res) {
 async function update(req, res) {
   const pool = getPool(req);
   const { id } = req.params;
-  const {
-    descripcion,
-    clasificacion,
-    cantidad,
-    valor_unitario,
-    valor_total,
-    fecha,
-    producto_id,
-    venta_item_id,
-  } = req.body;
+  const body = req.body;
 
-  if (!descripcion || !descripcion.trim()) {
+  if (body.descripcion !== undefined && (!body.descripcion || !body.descripcion.trim())) {
     return res.status(400).json({ error: "La descripción del gasto es obligatoria" });
   }
-  if (!cantidad || cantidad <= 0) {
+  if (body.cantidad !== undefined && (!body.cantidad || body.cantidad <= 0)) {
     return res.status(400).json({ error: "La cantidad debe ser mayor a 0" });
   }
-  if (!valor_unitario || valor_unitario <= 0) {
+  if (body.valor_unitario !== undefined && (!body.valor_unitario || body.valor_unitario <= 0)) {
     return res.status(400).json({ error: "El valor unitario debe ser mayor a 0" });
   }
-
-  if (venta_item_id && producto_id) {
+  if (body.venta_item_id && body.producto_id) {
     return res.status(400).json({
       error: "No puedes asignar un gasto de producto directamente a una venta. El producto debe pasar por inventario (usa consumir)",
     });
   }
 
+  const fieldMap = {
+    descripcion: "descripcion",
+    clasificacion: "clasificacion",
+    cantidad: "cantidad",
+    valor_unitario: "valor_unitario",
+    valor_total: "valor_total",
+    fecha: "fecha",
+    producto_id: "producto_id",
+    venta_item_id: "venta_item_id",
+  };
+
+  const sets = [];
+  const params = [];
+  let idx = 1;
+
+  for (const [key, col] of Object.entries(fieldMap)) {
+    if (body[key] !== undefined) {
+      sets.push(`${col} = $${idx}`);
+      params.push(key === "descripcion" ? body[key].trim() : body[key]);
+      idx++;
+    }
+  }
+
+  if (sets.length === 0) {
+    return res.status(400).json({ error: "No hay campos para actualizar" });
+  }
+
+  sets.push(`updated_at = now()`);
+  params.push(id);
+
   try {
-    const computed_total = valor_total != null ? valor_total : cantidad * valor_unitario;
     const result = await pool.query(
-      `UPDATE gastos.gastos
-       SET descripcion = $1, clasificacion = $2, cantidad = $3,
-           valor_unitario = $4, valor_total = $5, fecha = $6,
-           producto_id = $7, venta_item_id = $8, updated_at = now()
-       WHERE id = $9
-       RETURNING *`,
-      [
-        descripcion.trim(),
-        clasificacion || null,
-        cantidad,
-        valor_unitario,
-        computed_total,
-        fecha || new Date(),
-        producto_id || null,
-        venta_item_id || null,
-        id,
-      ]
+      `UPDATE gastos.gastos SET ${sets.join(", ")} WHERE id = $${idx} RETURNING *`,
+      params
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Gasto no encontrado" });

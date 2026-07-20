@@ -381,7 +381,11 @@ export default function Gestos() {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setVinculoGastoId(g.id); setVinculoModalOpen(true); }}
-                              className="px-2.5 py-1.5 text-xs rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                              className={`px-2.5 py-1.5 text-xs rounded-lg ${
+                                g.producto_id
+                                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                  : "border border-emerald-600 text-emerald-600 hover:bg-emerald-50"
+                              }`}
                             >
                               Producto
                             </button>
