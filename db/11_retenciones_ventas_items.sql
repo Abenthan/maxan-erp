@@ -96,6 +96,6 @@ SELECT
         ELSE 999
     END AS dias_vencida
 FROM facturacion.ventas v
-JOIN facturacion.terceros t ON t.id = v.receptor_id
+JOIN generales.terceros t ON t.id = v.receptor_id
 WHERE v.estado NOT IN ('anulada', 'rechazada')
 ORDER BY v.fecha_vencimiento_pago NULLS LAST, v.fecha_emision DESC;

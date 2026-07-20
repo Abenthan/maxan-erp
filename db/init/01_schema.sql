@@ -6,12 +6,13 @@
 -- =====================================================================
 
 CREATE SCHEMA IF NOT EXISTS facturacion;
+CREATE SCHEMA IF NOT EXISTS generales;
 SET search_path TO facturacion;
 
 -- ---------------------------------------------------------------------
 -- 1. TERCEROS (emisores y receptores: clientes, proveedores, tú mismo)
 -- ---------------------------------------------------------------------
-CREATE TABLE terceros (
+CREATE TABLE generales.terceros (
     id                  SERIAL PRIMARY KEY,
     tipo_documento      VARCHAR(5)   NOT NULL,        -- schemeID DIAN: 13=NIT, 31=NIT jurídico, etc.
     numero_documento    VARCHAR(20)  NOT NULL,
@@ -70,8 +71,8 @@ CREATE TABLE facturas (
     valor_a_pagar               NUMERIC(18,2) NOT NULL,
 
     -- Partes involucradas
-    emisor_id                   INT NOT NULL REFERENCES terceros(id),
-    receptor_id                 INT NOT NULL REFERENCES terceros(id),
+    emisor_id                   INT NOT NULL REFERENCES generales.terceros(id),
+    receptor_id                 INT NOT NULL REFERENCES generales.terceros(id),
 
     -- Resolución de facturación (DIAN InvoiceControl)
     resolucion_numero           VARCHAR(50),
@@ -184,7 +185,7 @@ CREATE TRIGGER trg_facturas_updated_at
     FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 
 CREATE TRIGGER trg_terceros_updated_at
-    BEFORE UPDATE ON terceros
+    BEFORE UPDATE ON generales.terceros
     FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 
 -- ---------------------------------------------------------------------
@@ -206,8 +207,8 @@ SELECT
     f.codigo_respuesta_dian,
     f.estado_validacion_dian
 FROM facturas f
-JOIN terceros e ON e.id = f.emisor_id
-JOIN terceros r ON r.id = f.receptor_id;
+JOIN generales.terceros e ON e.id = f.emisor_id
+JOIN generales.terceros r ON r.id = f.receptor_id;
 
 
 -- =====================================================================
@@ -238,8 +239,8 @@ CREATE TABLE compras.facturas_compra (
     valor_iva               NUMERIC(18,2) DEFAULT 0,
     valor_a_pagar            NUMERIC(18,2) NOT NULL,
 
-    proveedor_id            INT NOT NULL REFERENCES facturacion.terceros(id),
-    receptor_id             INT NOT NULL REFERENCES facturacion.terceros(id),
+    proveedor_id            INT NOT NULL REFERENCES generales.terceros(id),
+    receptor_id             INT NOT NULL REFERENCES generales.terceros(id),
 
     estado                  VARCHAR(20) DEFAULT 'recibida'
                              CHECK (estado IN ('recibida','pendiente_pago','pagada_parcial','pagada','anulada','rechazada')),
@@ -299,7 +300,7 @@ CREATE TABLE gastos.gastos (
     id                  SERIAL PRIMARY KEY,
 
     factura_compra_id   INT REFERENCES compras.facturas_compra(id) ON DELETE CASCADE, -- NULL = gasto suelto
-    proveedor_id        INT REFERENCES facturacion.terceros(id),                      -- opcional si es informal
+    proveedor_id        INT REFERENCES generales.terceros(id),                      -- opcional si es informal
 
     producto_id         INT REFERENCES inventario.productos(id),     -- si es físico revendible
     venta_item_id        INT REFERENCES facturacion.ventas_items(id), -- asignación directa (solo si producto_id IS NULL)
@@ -532,8 +533,8 @@ SELECT
     v.codigo_respuesta_dian,
     v.estado_validacion_dian
 FROM facturacion.ventas v
-JOIN facturacion.terceros e ON e.id = v.emisor_id
-JOIN facturacion.terceros r ON r.id = v.receptor_id;
+JOIN generales.terceros e ON e.id = v.emisor_id
+JOIN generales.terceros r ON r.id = v.receptor_id;
 
 CREATE OR REPLACE VIEW facturacion.vw_utilidad_items AS
 SELECT
@@ -712,7 +713,7 @@ ON CONFLICT (nombre) DO NOTHING;
 -- ---------------------------------------------------------------------
 CREATE TABLE cartera.pagos (
     id              SERIAL PRIMARY KEY,
-    cliente_id      INT NOT NULL REFERENCES facturacion.terceros(id),
+    cliente_id      INT NOT NULL REFERENCES generales.terceros(id),
     medio_pago_id   INT REFERENCES cartera.medios_pago(id),
     referencia      VARCHAR(100),
     fecha_pago      DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -847,7 +848,7 @@ SELECT
         ELSE 999
     END AS dias_vencida
 FROM facturacion.ventas v
-JOIN facturacion.terceros t ON t.id = v.receptor_id
+JOIN generales.terceros t ON t.id = v.receptor_id
 WHERE v.estado NOT IN ('anulada', 'rechazada')
 ORDER BY v.fecha_vencimiento_pago NULLS LAST, v.fecha_emision DESC;
 
@@ -867,7 +868,7 @@ SELECT
     COALESCE(pa.total_aplicado, 0) AS total_aplicado,
     CASE WHEN COALESCE(pa.total_aplicado, 0) < p.valor_total THEN p.valor_total - COALESCE(pa.total_aplicado, 0) ELSE 0 END AS sin_aplicar
 FROM cartera.pagos p
-JOIN facturacion.terceros t ON t.id = p.cliente_id
+JOIN generales.terceros t ON t.id = p.cliente_id
 LEFT JOIN cartera.medios_pago mp ON mp.id = p.medio_pago_id
 LEFT JOIN (
     SELECT pago_id, COUNT(*) AS facturas_aplicadas, SUM(valor_aplicado) AS total_aplicado
@@ -1023,7 +1024,7 @@ SELECT
         ELSE 999
     END AS dias_vencida
 FROM facturacion.ventas v
-JOIN facturacion.terceros t ON t.id = v.receptor_id
+JOIN generales.terceros t ON t.id = v.receptor_id
 WHERE v.estado NOT IN ('anulada', 'rechazada')
 ORDER BY v.fecha_vencimiento_pago NULLS LAST, v.fecha_emision DESC;
 
@@ -1052,8 +1053,8 @@ SELECT
     v.estado_validacion_dian,
     v.observaciones
 FROM facturacion.ventas v
-JOIN facturacion.terceros e ON e.id = v.emisor_id
-JOIN facturacion.terceros r ON r.id = v.receptor_id;
+JOIN generales.terceros e ON e.id = v.emisor_id
+JOIN generales.terceros r ON r.id = v.receptor_id;
 
 
 CREATE SCHEMA IF NOT EXISTS usuarios;
@@ -1147,7 +1148,7 @@ INSERT INTO helpdesk.categorias_mantenimiento (nombre, color) VALUES
 -- ------------------------------------------------------------------
 CREATE TABLE helpdesk.recursos (
   id SERIAL PRIMARY KEY,
-  cliente_id INTEGER NOT NULL REFERENCES facturacion.terceros(id),
+  cliente_id INTEGER NOT NULL REFERENCES generales.terceros(id),
   nombre VARCHAR(200) NOT NULL,
   tipo VARCHAR(50) NOT NULL DEFAULT 'Computador'
     CHECK (tipo IN ('Computador', 'Hosting', 'Office 365', 'Red', 'Celular', 'Impresora', 'Servidor', 'UPS', 'Cámara', 'Otro')),
@@ -1217,7 +1218,7 @@ CREATE TABLE helpdesk.mantenimiento_detalles (
 -- ================================================================
 -- SEED: TERCEROS (clientes desde Notion)
 -- ================================================================
-INSERT INTO facturacion.terceros (tipo_documento, numero_documento, razon_social) VALUES
+INSERT INTO generales.terceros (tipo_documento, numero_documento, razon_social) VALUES
   ('NI', '900000001', 'Gestión Calidad'),
   ('NI', '900000002', 'Transglobal de Carga'),
   ('NI', '900000003', 'Montacargas y Transportes'),
@@ -1239,15 +1240,15 @@ ON CONFLICT (tipo_documento, numero_documento) DO NOTHING;
 -- ================================================================
 DO $$
 DECLARE
-  v_gestion_calidad   INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000001');
-  v_transglobal       INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000002');
-  v_montacargas       INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000003');
-  v_promatel          INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000004');
-  v_grupo_carpini     INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000005');
-  v_simbolo           INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000006');
-  v_bekko             INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000007');
-  v_m2_contable       INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000008');
-  v_ankaras           INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000009');
+  v_gestion_calidad   INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000001');
+  v_transglobal       INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000002');
+  v_montacargas       INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000003');
+  v_promatel          INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000004');
+  v_grupo_carpini     INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000005');
+  v_simbolo           INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000006');
+  v_bekko             INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000007');
+  v_m2_contable       INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000008');
+  v_ankaras           INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000009');
 BEGIN
 
   -- Gestión Calidad
@@ -1353,7 +1354,7 @@ CREATE SCHEMA IF NOT EXISTS generales;
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS generales.contactos (
   id SERIAL PRIMARY KEY,
-  cliente_id INTEGER REFERENCES facturacion.terceros(id) ON DELETE CASCADE,
+  cliente_id INTEGER REFERENCES generales.terceros(id) ON DELETE CASCADE,
   nombre VARCHAR(200) NOT NULL,
   telefono VARCHAR(50),
   email VARCHAR(200),
@@ -1382,7 +1383,7 @@ CREATE TABLE IF NOT EXISTS helpdesk.casos (
   descripcion TEXT,
   categoria_id INTEGER REFERENCES helpdesk.categorias_caso(id),
   recurso_id INTEGER REFERENCES helpdesk.recursos(id),
-  cliente_id INTEGER REFERENCES facturacion.terceros(id),
+  cliente_id INTEGER REFERENCES generales.terceros(id),
   contacto_id INTEGER REFERENCES generales.contactos(id),
   tecnico_id INTEGER REFERENCES usuarios.usuarios(id),
   estado VARCHAR(20) DEFAULT 'Pendiente'
@@ -1428,15 +1429,15 @@ CREATE TABLE IF NOT EXISTS helpdesk.caso_detalles (
 );
 
 
-ALTER TABLE facturacion.terceros ADD COLUMN es_cliente BOOLEAN DEFAULT FALSE;
-ALTER TABLE facturacion.terceros ADD COLUMN es_proveedor BOOLEAN DEFAULT FALSE;
+ALTER TABLE generales.terceros ADD COLUMN es_cliente BOOLEAN DEFAULT FALSE;
+ALTER TABLE generales.terceros ADD COLUMN es_proveedor BOOLEAN DEFAULT FALSE;
 
 -- Backfill: terceros que aparecen como receptor en ventas son clientes
-UPDATE facturacion.terceros SET es_cliente = TRUE
+UPDATE generales.terceros SET es_cliente = TRUE
 WHERE id IN (SELECT DISTINCT receptor_id FROM facturacion.ventas);
 
 -- Backfill: terceros que aparecen como emisor/proveedor en ventas/compras son proveedores
-UPDATE facturacion.terceros SET es_proveedor = TRUE
+UPDATE generales.terceros SET es_proveedor = TRUE
 WHERE id IN (SELECT DISTINCT emisor_id FROM facturacion.ventas)
    OR id IN (SELECT DISTINCT proveedor_id FROM compras.facturas_compra);
 

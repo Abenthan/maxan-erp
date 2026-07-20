@@ -15,5 +15,5 @@ SELECT
     v.estado_validacion_dian,
     v.observaciones
 FROM facturacion.ventas v
-JOIN facturacion.terceros e ON e.id = v.emisor_id
-JOIN facturacion.terceros r ON r.id = v.receptor_id;
+JOIN generales.terceros e ON e.id = v.emisor_id
+JOIN generales.terceros r ON r.id = v.receptor_id;

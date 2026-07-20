@@ -26,8 +26,8 @@ CREATE TABLE compras.facturas_compra (
     valor_iva               NUMERIC(18,2) DEFAULT 0,
     valor_a_pagar            NUMERIC(18,2) NOT NULL,
 
-    proveedor_id            INT NOT NULL REFERENCES facturacion.terceros(id),
-    receptor_id             INT NOT NULL REFERENCES facturacion.terceros(id),
+    proveedor_id            INT NOT NULL REFERENCES generales.terceros(id),
+    receptor_id             INT NOT NULL REFERENCES generales.terceros(id),
 
     estado                  VARCHAR(20) DEFAULT 'recibida'
                              CHECK (estado IN ('recibida','pendiente_pago','pagada_parcial','pagada','anulada','rechazada')),
@@ -87,7 +87,7 @@ CREATE TABLE gastos.gastos (
     id                  SERIAL PRIMARY KEY,
 
     factura_compra_id   INT REFERENCES compras.facturas_compra(id) ON DELETE CASCADE, -- NULL = gasto suelto
-    proveedor_id        INT REFERENCES facturacion.terceros(id),                      -- opcional si es informal
+    proveedor_id        INT REFERENCES generales.terceros(id),                      -- opcional si es informal
 
     producto_id         INT REFERENCES inventario.productos(id),     -- si es físico revendible
     venta_item_id        INT REFERENCES facturacion.ventas_items(id), -- asignación directa (solo si producto_id IS NULL)

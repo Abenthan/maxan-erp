@@ -313,7 +313,7 @@ async function listClientesConDeuda(req, res) {
       `SELECT t.id, t.razon_social, t.numero_documento,
               COALESCE(SUM(v.saldo_pendiente), 0) AS total_deuda,
               COUNT(v.id) AS facturas_pendientes
-       FROM facturacion.terceros t
+       FROM generales.terceros t
        JOIN facturacion.ventas v ON v.receptor_id = t.id
        WHERE v.estado NOT IN ('anulada', 'rechazada', 'pagada')
          AND COALESCE(v.saldo_pendiente, v.valor_a_pagar) > 0
@@ -366,7 +366,7 @@ async function listRetenciones(req, res) {
          v.estado,
          v.saldo_pendiente
        FROM facturacion.ventas v
-       JOIN facturacion.terceros t ON t.id = v.receptor_id
+       JOIN generales.terceros t ON t.id = v.receptor_id
        WHERE v.valor_retencion_fuente > 0
        ORDER BY v.fecha_emision DESC`
     );

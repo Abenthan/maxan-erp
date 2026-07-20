@@ -4,7 +4,7 @@ exports.listar = async (req, res) => {
   const { cliente_id, q } = req.query;
   let sql = `SELECT con.*, t.razon_social AS cliente_nombre
              FROM generales.contactos con
-             LEFT JOIN facturacion.terceros t ON t.id = con.cliente_id
+             LEFT JOIN generales.terceros t ON t.id = con.cliente_id
              WHERE 1=1`;
   const params = [];
   if (cliente_id) { params.push(cliente_id); sql += ` AND con.cliente_id = $${params.length}`; }
@@ -23,7 +23,7 @@ exports.obtener = async (req, res) => {
     const result = await db(req).query(
       `SELECT con.*, t.razon_social AS cliente_nombre
        FROM generales.contactos con
-       LEFT JOIN facturacion.terceros t ON t.id = con.cliente_id
+       LEFT JOIN generales.terceros t ON t.id = con.cliente_id
        WHERE con.id = $1`,
       [req.params.id]
     );

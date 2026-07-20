@@ -40,7 +40,7 @@ export default function Inventario() {
           </thead>
           <tbody>
             {stock.map((s) => (
-              <tr key={s.producto_id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/financiero/inventario/movimientos?producto_id=${s.producto_id}&nombre=${encodeURIComponent(s.nombre)}`)}>
+              <tr key={s.producto_id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/inventario/movimientos?producto_id=${s.producto_id}&nombre=${encodeURIComponent(s.nombre)}`)}>
                 <td className="p-3 font-medium">{s.nombre}</td>
                 <td className="p-3 text-gray-600">{s.categoria || "-"}</td>
                 <td className={`p-3 text-right font-bold ${Number(s.stock_actual) > 0 ? "text-green-600" : "text-red-600"}`}>

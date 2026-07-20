@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
 import { usePermiso } from "../context/AuthContext";
 
@@ -33,22 +33,6 @@ interface Gasto {
   venta_item_id: number | null;
 }
 
-interface Venta {
-  id: number;
-  numero_completo: string;
-  fecha_emision: string;
-  receptor: string;
-  nit_receptor: string;
-}
-
-interface VentaItem {
-  id: number;
-  venta_id: number;
-  numero_linea: number;
-  descripcion: string;
-  valor_linea: string;
-}
-
 function formatCurrency(n: number): string {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
 }
@@ -60,6 +44,7 @@ const clasifBadge: Record<string, string> = {
 };
 
 export default function Gestos() {
+  const navigate = useNavigate();
   const api = useApi();
   const puedeGestionar = usePermiso("gastos.gestionar");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -69,8 +54,6 @@ export default function Gestos() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [clasificaciones, setClasificaciones] = useState<Clasificacion[]>([]);
-  const [ventas, setVentas] = useState<Venta[]>([]);
-  const [ventaItems, setVentaItems] = useState<VentaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -85,10 +68,6 @@ export default function Gestos() {
   const [vrUnit, setVrUnit] = useState("");
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [productoId, setProductoId] = useState("");
-  const [codigoProducto, setCodigoProducto] = useState("");
-  const [ventaId, setVentaId] = useState("");
-  const [ventaItemId, setVentaItemId] = useState("");
-  const [loadingVentaItems, setLoadingVentaItems] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [sortKey, setSortKey] = useState<keyof Gasto>("fecha");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -105,6 +84,9 @@ export default function Gestos() {
   const [showClasifModal, setShowClasifModal] = useState(false);
   const [nuevaClasif, setNuevaClasif] = useState("");
 
+  const [vinculoModalOpen, setVinculoModalOpen] = useState(false);
+  const [vinculoGastoId, setVinculoGastoId] = useState<number | null>(null);
+
   const cargar = useCallback(() => {
     setLoading(true);
     const params: Record<string, string> = {};
@@ -113,10 +95,9 @@ export default function Gestos() {
       api.get<Gasto[]>("/gastos", params),
       api.get<Producto[]>("/productos"),
       api.get<Categoria[]>("/productos/categorias"),
-      api.get<Venta[]>("/facturas"),
       api.get<Clasificacion[]>("/gastos/clasificaciones"),
     ])
-      .then(([g, p, c, v, cl]) => { setGastos(g); setProductos(p); setCategorias(c); setVentas(v); setClasificaciones(cl); })
+      .then(([g, p, c, cl]) => { setGastos(g); setProductos(p); setCategorias(c); setClasificaciones(cl); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [api, filtroProductoId]);
@@ -132,10 +113,6 @@ export default function Gestos() {
     setVrUnit("");
     setFecha(new Date().toISOString().slice(0, 10));
     setProductoId("");
-    setCodigoProducto("");
-    setVentaId("");
-    setVentaItemId("");
-    setVentaItems([]);
   }
 
   function toggleSort(key: keyof Gasto) {
@@ -186,17 +163,6 @@ export default function Gestos() {
     });
   }, [gastos, filtroDesc, filtroFechaDesde, filtroFechaHasta, sortKey, sortDir]);
 
-  const cargarVentaItems = useCallback((vId: string) => {
-    if (!vId) { setVentaItems([]); return; }
-    setLoadingVentaItems(true);
-    api.get<VentaItem[]>(`/ventas/items?venta_id=${vId}`)
-      .then((items) => setVentaItems(items))
-      .catch(() => setVentaItems([]))
-      .finally(() => setLoadingVentaItems(false));
-  }, [api]);
-
-  useEffect(() => { cargarVentaItems(ventaId); }, [ventaId, cargarVentaItems]);
-
   const totalCalculado = useMemo(() => {
     const c = parseFloat(cant) || 0;
     const u = parseFloat(vrUnit) || 0;
@@ -212,21 +178,6 @@ export default function Gestos() {
     setVrUnit(Number(g.valor_unitario).toString());
     setFecha(g.fecha.slice(0, 10));
     setProductoId(g.producto_id ? String(g.producto_id) : "");
-    setCodigoProducto(g.codigo_producto || "");
-    setVentaItemId(g.venta_item_id ? String(g.venta_item_id) : "");
-    setVentaId("");
-    setVentaItems([]);
-    if (g.venta_item_id) {
-      api.get<VentaItem[]>(`/ventas/items`)
-        .then((items) => {
-          const item = items.find((i) => i.id === g.venta_item_id);
-          if (item) {
-            setVentaId(String(item.venta_id));
-            setVentaItems(items.filter((i) => i.venta_id === item.venta_id));
-          }
-        })
-        .catch(() => {});
-    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -247,10 +198,6 @@ export default function Gestos() {
       if (productoId) {
         body.producto_id = parseInt(productoId, 10);
         body.clasificacion = undefined;
-      }
-      if (ventaItemId) {
-        body.venta_item_id = parseInt(ventaItemId, 10);
-        body.producto_id = undefined;
       }
       if (editId) {
         await api.put(`/gastos/${editId}`, body);
@@ -310,7 +257,17 @@ export default function Gestos() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Gastos</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Gastos</h1>
+        {puedeGestionar && (
+          <button
+            onClick={() => navigate("/financiero/nuevo-gasto")}
+            className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
+          >
+            + Nuevo Gasto
+          </button>
+        )}
+      </div>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
@@ -371,7 +328,7 @@ export default function Gestos() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8">
-        <div className="overflow-y-auto max-h-[400px]">
+        <div className="overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white">
               <tr className="bg-gray-50 border-b text-left">
@@ -381,6 +338,7 @@ export default function Gestos() {
                 <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none" onClick={() => toggleSort("cantidad")}>Cantidad<SortIcon column="cantidad" /></th>
                 <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none text-right" onClick={() => toggleSort("valor_unitario")}>Vr Unitario<SortIcon column="valor_unitario" /></th>
                 <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none text-right" onClick={() => toggleSort("valor_total")}>Total<SortIcon column="valor_total" /></th>
+                {puedeGestionar && <th className="p-3 font-semibold text-gray-600">Acción</th>}
               </tr>
             </thead>
             <tbody>
@@ -394,8 +352,7 @@ export default function Gestos() {
                 filtrados.map((g) => (
                     <tr
                       key={g.id}
-                      onClick={() => puedeGestionar && seleccionar(g)}
-                      className={`border-b hover:bg-gray-50 ${puedeGestionar ? "cursor-pointer" : ""} ${editId === g.id ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : ""}`}
+                      className={`border-b hover:bg-gray-50 ${editId === g.id ? "bg-blue-50" : ""}`}
                     >
                       <td className="p-3 text-gray-600">{new Date(g.fecha).toLocaleDateString("es-CO")}</td>
                       <td className="p-3 font-medium">{g.descripcion}</td>
@@ -411,6 +368,26 @@ export default function Gestos() {
                       <td className="p-3 text-gray-600">{Number(g.cantidad).toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
                       <td className="p-3 text-right">{formatCurrency(Number(g.valor_unitario))}</td>
                       <td className="p-3 text-right font-medium">{formatCurrency(Number(g.valor_total))}</td>
+                      {puedeGestionar && (
+                        <td className="p-3">
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); seleccionar(g); }}
+                              className="px-2.5 py-1.5 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setVinculoGastoId(g.id); setVinculoModalOpen(true); }}
+                              className="px-2.5 py-1.5 text-xs rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              Producto
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                 ))
               )}
@@ -418,167 +395,6 @@ export default function Gestos() {
           </table>
         </div>
       </div>
-
-      {puedeGestionar && !editId && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Nuevo Gasto</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Fecha</label>
-              <input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="lg:col-span-2">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Descripción *</label>
-              <input
-                type="text"
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-                onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
-                required
-                placeholder="Ej: Servicio de mensajería"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Valor Unitario *</label>
-              <input
-                type="number"
-                step="any"
-                min="0.01"
-                value={vrUnit}
-                onChange={(e) => setVrUnit(e.target.value)}
-                onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
-                required
-                placeholder="0.00"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="max-w-28">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Cantidad</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={cant}
-                onChange={(e) => setCant(e.target.value)}
-                onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
-                required
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Total (auto)</label>
-              <div className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700 font-medium">
-                {formatCurrency(totalCalculado)}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Clasificación</label>
-              <div className="flex gap-1">
-                <select
-                  value={clasif}
-                  onChange={(e) => setClasif(e.target.value)}
-                  onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
-                  disabled={!!productoId}
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                >
-                  {clasificaciones.filter((c) => c.nombre !== "Suministros").map((c) => (
-                    <option key={c.id} value={c.nombre}>{c.nombre}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setShowClasifModal(true)}
-                  title="Administrar clasificaciones"
-                  className="px-2.5 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600 shrink-0"
-                >
-                  ⚙
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Producto (opcional)</label>
-              <div className="flex gap-1">
-                <select
-                  value={productoId}
-                  onChange={(e) => {
-                    setProductoId(e.target.value);
-                    if (e.target.value) setClasif("Administrativo");
-                  }}
-                  onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
-                >
-                  <option value="">-- Ninguno --</option>
-                  {productos.filter((p) => p.id).map((p) => (
-                    <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => { setProdCodigo(codigoProducto); setProdNombre(desc); setProdCategoria(""); setProdUnidad("UND"); setProdInventariable(true); setShowModal(true); }}
-                  title="Crear producto rápido"
-                  className="px-2.5 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600 shrink-0"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Factura de Venta (opcional)</label>
-              <select
-                value={ventaId}
-                onChange={(e) => {
-                  setVentaId(e.target.value);
-                  setVentaItemId("");
-                  if (e.target.value) setProductoId("");
-                }}
-                onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
-              >
-                <option value="">-- Ninguna --</option>
-                {ventas.map((v) => (
-                  <option key={v.id} value={v.id}>{v.numero_completo} — {v.receptor} ({new Date(v.fecha_emision).toLocaleDateString("es-CO")})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Item de Venta</label>
-              <select
-                value={ventaItemId}
-                onChange={(e) => {
-                  setVentaItemId(e.target.value);
-                  if (e.target.value) setProductoId("");
-                  if (!e.target.value) { setVentaId(""); setVentaItems([]); }
-                }}
-                disabled={!ventaId || loadingVentaItems}
-                onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto")?.click(); }}}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0 disabled:bg-gray-100 disabled:text-gray-400"
-              >
-                <option value="">{loadingVentaItems ? "Cargando..." : "-- Seleccionar --"}</option>
-                {ventaItems.map((i) => (
-                  <option key={i.id} value={i.id}>Línea {i.numero_linea}: {i.descripcion.slice(0, 60)} — ${Number(i.valor_linea).toLocaleString("es-CO")}</option>
-                ))}
-              </select>
-            </div>
-            <div className="lg:col-span-4 flex justify-end gap-3">
-              <button
-                id="guardar-gasto"
-                type="submit"
-                disabled={guardando || !desc.trim() || !vrUnit}
-                className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
-              >
-                {guardando ? "Guardando..." : "Guardar Gasto"} <span className="text-blue-200 text-xs ml-1">Ctrl+G</span>
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {puedeGestionar && editId && editModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => limpiarForm()}>
@@ -665,70 +481,6 @@ export default function Gestos() {
                 </div>
               </div>
               <div className="hidden lg:block"></div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Producto (opcional)</label>
-                <div className="flex gap-1">
-                  <select
-                    value={productoId}
-                    onChange={(e) => {
-                      setProductoId(e.target.value);
-                      if (e.target.value) setClasif("Administrativo");
-                    }}
-                    onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto-modal")?.click(); }}}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
-                  >
-                    <option value="">-- Ninguno --</option>
-                    {productos.filter((p) => p.id).map((p) => (
-                      <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => { setProdCodigo(codigoProducto); setProdNombre(desc); setProdCategoria(""); setProdUnidad("UND"); setProdInventariable(true); setShowModal(true); }}
-                    title="Crear producto rápido"
-                    className="px-2.5 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600 shrink-0"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Factura de Venta (opcional)</label>
-                <select
-                  value={ventaId}
-                  onChange={(e) => {
-                    setVentaId(e.target.value);
-                    setVentaItemId("");
-                    if (e.target.value) setProductoId("");
-                  }}
-                  onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto-modal")?.click(); }}}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
-                >
-                  <option value="">-- Ninguna --</option>
-                  {ventas.map((v) => (
-                    <option key={v.id} value={v.id}>{v.numero_completo} — {v.receptor} ({new Date(v.fecha_emision).toLocaleDateString("es-CO")})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Item de Venta</label>
-                <select
-                  value={ventaItemId}
-                  onChange={(e) => {
-                    setVentaItemId(e.target.value);
-                    if (e.target.value) setProductoId("");
-                    if (!e.target.value) { setVentaId(""); setVentaItems([]); }
-                  }}
-                  disabled={!ventaId || loadingVentaItems}
-                  onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "g") { e.preventDefault(); document.querySelector<HTMLButtonElement>("#guardar-gasto-modal")?.click(); }}}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0 disabled:bg-gray-100 disabled:text-gray-400"
-                >
-                  <option value="">{loadingVentaItems ? "Cargando..." : "-- Seleccionar --"}</option>
-                  {ventaItems.map((i) => (
-                    <option key={i.id} value={i.id}>Línea {i.numero_linea}: {i.descripcion.slice(0, 60)} — ${Number(i.valor_linea).toLocaleString("es-CO")}</option>
-                  ))}
-                </select>
-              </div>
               <div className="lg:col-span-4 flex justify-between gap-3">
                 <button
                   type="button"
@@ -920,6 +672,159 @@ export default function Gestos() {
           </div>
         </div>
       )}
+
+      {puedeGestionar && vinculoModalOpen && vinculoGastoId && (
+        <VinculoProductoModal
+          gastoId={vinculoGastoId}
+          productos={productos}
+          productoActual={gastos.find((g) => g.id === vinculoGastoId)?.producto_id ?? null}
+          api={api}
+          onClose={() => setVinculoModalOpen(false)}
+          onVinculado={() => { setVinculoModalOpen(false); cargar(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function VinculoProductoModal({ gastoId, productos, productoActual, api, onClose, onVinculado }: {
+  gastoId: number;
+  productos: Producto[];
+  productoActual: number | null;
+  api: ReturnType<typeof useApi>;
+  onClose: () => void;
+  onVinculado: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [seleccionado, setSeleccionado] = useState<string>(productoActual ? String(productoActual) : "");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const filtrados = useMemo(() => {
+    if (!search) return productos;
+    const q = search.toLowerCase();
+    return productos.filter((p) =>
+      p.nombre.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q)
+    );
+  }, [productos, search]);
+
+  async function handleGuardar() {
+    if (!seleccionado) return;
+    setGuardando(true);
+    setError("");
+    try {
+      await api.put(`/gastos/${gastoId}`, { producto_id: parseInt(seleccionado, 10) });
+      onVinculado();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error al vincular producto");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function handleDesvincular() {
+    setGuardando(true);
+    setError("");
+    try {
+      await api.put(`/gastos/${gastoId}`, { producto_id: null });
+      onVinculado();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error al desvincular producto");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  const prodSel = productos.find((p) => String(p.id) === seleccionado);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-lg mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Vincular Producto</h3>
+        <p className="text-xs text-gray-400 mb-4">Gasto #{gastoId}</p>
+
+        {error && (
+          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
+        )}
+
+        {productoActual && (
+          <div className="mb-3 flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <span className="text-sm text-blue-800">
+              Producto actual: {productos.find((p) => p.id === productoActual)?.nombre || `#${productoActual}`}
+            </span>
+            <button
+              type="button"
+              onClick={handleDesvincular}
+              disabled={guardando}
+              className="text-xs text-red-600 hover:text-red-800 font-medium underline"
+            >
+              Desvincular
+            </button>
+          </div>
+        )}
+
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar producto por nombre o código..."
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-3"
+          autoFocus
+        />
+
+        <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg min-h-0 max-h-60">
+          {filtrados.length === 0 ? (
+            <p className="p-4 text-sm text-gray-400 text-center">No se encontraron productos</p>
+          ) : (
+            filtrados.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setSeleccionado(String(p.id))}
+                className={`w-full text-left px-4 py-2.5 text-sm border-b border-gray-100 hover:bg-emerald-50 transition-colors flex items-center gap-3 ${
+                  String(p.id) === seleccionado ? "bg-emerald-100 font-semibold" : ""
+                }`}
+              >
+                <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  String(p.id) === seleccionado ? "border-emerald-600 bg-emerald-600" : "border-gray-300"
+                }`}>
+                  {String(p.id) === seleccionado && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </span>
+                <span className="text-gray-500 font-mono text-xs">{p.codigo}</span>
+                <span className="text-gray-800">{p.nombre}</span>
+              </button>
+            ))
+          )}
+        </div>
+
+        {prodSel && (
+          <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
+            Seleccionado: <strong>{prodSel.codigo}</strong> — {prodSel.nombre}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3 mt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleGuardar}
+            disabled={!seleccionado || guardando}
+            className="px-6 py-2 text-sm rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {guardando ? "Guardando..." : "Vincular Producto"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ function getPool(req) {
 async function upsertTercero(client, tercero, extra = {}) {
   const { es_cliente, es_proveedor } = extra;
   const q = `
-    INSERT INTO facturacion.terceros
+    INSERT INTO generales.terceros
       (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
        razon_social, direccion, codigo_ciudad, ciudad, departamento, pais,
        telefono, email, es_cliente, es_proveedor)
@@ -18,8 +18,8 @@ async function upsertTercero(client, tercero, extra = {}) {
       departamento = EXCLUDED.departamento,
       email = EXCLUDED.email,
       telefono = EXCLUDED.telefono,
-      es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE facturacion.terceros.es_cliente END,
-      es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE facturacion.terceros.es_proveedor END,
+      es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE generales.terceros.es_cliente END,
+      es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE generales.terceros.es_proveedor END,
       updated_at = now()
     RETURNING id`;
   const vals = [
@@ -106,7 +106,7 @@ async function parsearXml(req, res) {
     if (factura.numero_completo && factura.emisor?.numero_documento) {
       const dup = await pool.query(
         `SELECT f.id FROM facturacion.ventas f
-         JOIN facturacion.terceros t ON t.id = f.emisor_id
+         JOIN generales.terceros t ON t.id = f.emisor_id
          WHERE f.numero_completo = $1 AND t.numero_documento = $2
          LIMIT 1`,
         [factura.numero_completo, factura.emisor.numero_documento]

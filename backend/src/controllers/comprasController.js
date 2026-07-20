@@ -32,7 +32,7 @@ async function upload(req, res) {
     await client.query("BEGIN");
 
     const upsertQ = `
-      INSERT INTO facturacion.terceros
+      INSERT INTO generales.terceros
         (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
          razon_social, direccion, codigo_ciudad, ciudad, departamento, pais,
          telefono, email, es_cliente, es_proveedor)
@@ -45,8 +45,8 @@ async function upload(req, res) {
         departamento = EXCLUDED.departamento,
         email = EXCLUDED.email,
         telefono = EXCLUDED.telefono,
-        es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE facturacion.terceros.es_cliente END,
-        es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE facturacion.terceros.es_proveedor END,
+        es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE generales.terceros.es_cliente END,
+        es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE generales.terceros.es_proveedor END,
         updated_at = now()
       RETURNING id`;
 
@@ -214,7 +214,7 @@ async function list(req, res) {
     const result = await pool.query(
       `SELECT fc.*, t.razon_social AS proveedor, t.numero_documento AS nit_proveedor
        FROM compras.facturas_compra fc
-       LEFT JOIN facturacion.terceros t ON t.id = fc.proveedor_id
+       LEFT JOIN generales.terceros t ON t.id = fc.proveedor_id
        ORDER BY fc.fecha_emision DESC`
     );
     res.json(result.rows);
@@ -231,7 +231,7 @@ async function getById(req, res) {
     const facturaResult = await pool.query(
       `SELECT fc.*, t.razon_social AS proveedor, t.numero_documento AS nit_proveedor
        FROM compras.facturas_compra fc
-       LEFT JOIN facturacion.terceros t ON t.id = fc.proveedor_id
+       LEFT JOIN generales.terceros t ON t.id = fc.proveedor_id
        WHERE fc.id = $1`,
       [id]
     );

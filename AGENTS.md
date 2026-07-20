@@ -9,12 +9,13 @@
 
 ## Arquitectura de módulos
 - `/` — Landing page con 4 módulos (Financiero, Helpdesk, Configuración, CRM)
-- `/financiero/*` — Layout sidebar (VENTAS azul, COSTOS naranja, CARTERA púrpura, INVENTARIO verde)
+- `/financiero/*` — Layout sidebar (VENTAS azul, COSTOS naranja, CARTERA púrpura, INVENTARIO verde). Header con "← Atrás" (navega hacia atrás).
 - `/helpdesk/*` — Layout simple (header + contenido)
 - `/configuracion/*` — Usuarios, roles y copia de seguridad
 - `/crm` — Placeholder
 - `/terceros` — Standalone, sin sidebar (usa HelpdeskLayout con header "Maxan ERP")
 - `/nuevo-tercero` — Standalone, sin sidebar (usa HelpdeskLayout)
+- `/financiero/nuevo-gasto` — Ruta bajo Layout financiero para crear gastos
 
 ## Sidebar Financiero (Layout.tsx)
 ```
@@ -44,7 +45,7 @@
 - Schema: `facturacion` en PostgreSQL
 
 ## Nuevos módulos backend
-- **Clientes** — `routes/terceros.js` → `GET /api/terceros` (con filtro `?q=`, `?tipo=cliente|proveedor`, `?tipo_documento=`), `GET /api/terceros/:id`, `POST /api/terceros` (crear/upsert con `es_cliente`/`es_proveedor`), `PUT /api/terceros/:id`, `DELETE /api/terceros/:id` (protegido con `authorize("terceros.gestionar")` + verifica `usuarios.gestionar` en controller — solo admins)
+- **Clientes** — `routes/terceros.js` → `GET /api/terceros` (con filtro `?q=`, `?tipo=cliente|proveedor`, `?tipo_documento=`), `GET /api/terceros/:id`, `POST /api/terceros` (crear/upsert con `es_cliente`/`es_proveedor`), `PUT /api/terceros/:id`, `DELETE /api/terceros/:id` (protegido con `authorize("terceros.gestionar")` + verifica `usuarios.gestionar` en controller — solo admins). `tipo_documento` y `numero_documento` opcionales (migración `24_terceros_documento_opcional.sql`).
 - **Productos** — `routes/productos.js` → `POST/GET/PUT /api/productos`, `GET/POST/DELETE /api/productos/categorias`
 - **Gastos** — `routes/gastos.js` → `POST/GET /api/gastos`, `PUT /api/gastos/:id`, `PUT /api/gastos/:id/vincular` (vincular/desvincular a venta_item_id), filtros `?producto_id=`, `?venta_item_id=`, `?sin_vinculo=true`
 - **Clasificaciones de Gasto** — `routes/clasificacionesGasto.js` → `GET/POST/DELETE /api/gastos/clasificaciones` (maestro como categorías de producto, con FK en `gastos.gastos.clasificacion`)
@@ -63,7 +64,7 @@
 - `pages/Dashboard.tsx` — Página principal `/` con cards de resumen, barras ventas/gastos/clasificación, top clientes, últimas facturas, utilidad por producto. Filtros: mes (select últimos 12 meses), cliente, factura ID.
 - `pages/Contactos.tsx` — CRUD completo de contactos en `/bases-de-datos/contactos`. Tabla con Nombre, Cliente, Teléfono, Email, WhatsApp, Cargo, Estado. Filtros: búsqueda + cliente. Modal edición/creación. Eliminar solo admins (`usuarios.gestionar`).
 - `pages/Productos.tsx` — Listado de catálogo con filtros (búsqueda + categoría), tabla, formulario crear/editar abajo, links a Stock y Gastos
-- `pages/Gastos.tsx` — Listado con filtros (descripción + rango fechas + producto_id por URL), scroll vertical, fila clickeable para editar en modal, Ctrl+G shortcut, quick-create product modal con checkbox inventariable. Clasificación con select dinámico desde `/api/gastos/clasificaciones` + botón ⚙ para administrar (agregar/eliminar) clasificaciones. Default "Administrativo". Cantidad limitada a 2 decimales.
+- `pages/Gastos.tsx` — Tabla de gastos con filtros (descripción + rango fechas + producto_id por URL), sin scroll vertical, fila clickeable para editar en modal, botón "+ Nuevo Gasto" en el header que navega a `/financiero/nuevo-gasto`. Clasificación con select + ⚙. Modal VinculoProductoModal para vincular/desvincular producto. Botón "Producto" por fila.
 - `pages/Compras.tsx` — Listado de facturas compra
 - `pages/NuevaCompra.tsx` — Subir XML de compra con preview + botón guardar (paso doble: parsear → mostrar → guardar)
 - `pages/Inventario.tsx` — Stock desde `vw_stock_disponible`
@@ -76,6 +77,7 @@
 - `pages/NuevoPago.tsx` — `/cartera/nuevo-pago` Página dedicada paso a paso (cliente → facturas → confirmar)
 - `pages/Retenciones.tsx` — `/cartera/retenciones` Listado de retenciones realizadas con total acumulado
 - `pages/NuevaVenta.tsx` — `/nueva-venta` y `/nueva-venta/:id` (edición). Cliente default "Ventas sin factura" con CC 123456789. Campo Observaciones con auto-focus. Items con dos columnas: Código (input, al perder foco busca producto por código exacto) y Producto (autocomplete por código/nombre). Si el producto es inventariable, al crear consume inventario. En modo edición carga datos vía GET y guarda con PUT.
+- `pages/NuevoGasto.tsx` — `/financiero/nuevo-gasto` Formulario para crear gastos, organizado en 4 secciones: Descripción del gasto, Clasificación, Producto (input búsqueda + lista filtrada con selección que se repliega a badge), Factura de Venta (opcional). Ruta bajo Layout financiero.
 - `context/ApiContext.tsx` — Métodos: `get`, `post`, `put`, `patch`, `del`, `postXml`, `upload`
 - `context/AuthContext.tsx` — Provider con `user`, `token`, `login()`, `logout()`, `hasPermiso()`. Hook `usePermiso(codigo)` y `useAuth()`. Detecta `isFirstRun` automáticamente.
 
@@ -144,11 +146,15 @@
 ## Schemas SQL
 - `db/init/01_schema.sql` — Schema consolidado (facturacion, compras, inventario, gastos, cartera, usuarios, generales, helpdesk). Se ejecuta automáticamente al crear el contenedor PostgreSQL por primera vez via `docker-entrypoint-initdb.d`.
 - `db/migrar_produccion.sql` — Script para ejecutar en DBeaver contra una BD de producción que se creó antes de tener el schema consolidado. Crea schemas cartera, usuarios, helpdesk y tablas faltantes.
-- Migraciones individuales en `db/`: `01_schema.sql` a `23_tipos_detalle.sql` (histórico, todo consolidado en `db/init/01_schema.sql`)
+- Migraciones individuales en `db/`: `01_schema.sql` a `24_terceros_documento_opcional.sql` (histórico, todo consolidado en `db/init/01_schema.sql`)
 - `db/migrar_contactos_a_generales.sql` — Migración para mover `helpdesk.contactos` a `generales.contactos` en BD existentes.
+- `db/migrar_terceros_a_generales.sql` — Migración para mover `facturacion.terceros` a `generales.terceros` en BD existentes (ejecutar después de actualizar `01_schema.sql` y backend).
 
 ## Schema `generales` (tablas compartidas entre módulos)
-- **contactos** — Personas de contacto de clientes (`facturacion.terceros`). FK desde `helpdesk.casos.contacto_id` y `helpdesk.casos_contactos.contacto_id`.
+- **terceros** — Clientes, proveedores y emisores (migrado desde `facturacion.terceros`).
+  - FK desde `facturacion.ventas.emisor_id`, `facturacion.ventas.receptor_id`, `compras.facturas_compra.proveedor_id`, `compras.facturas_compra.receptor_id`, `gastos.gastos.proveedor_id`, `cartera.pagos.cliente_id`, `helpdesk.recursos.cliente_id`, `helpdesk.casos.cliente_id`, `generales.contactos.cliente_id`.
+  - Endpoint: `GET/POST/PUT/DELETE /api/terceros` (sin cambios en la ruta).
+- **contactos** — Personas de contacto de clientes (`generales.terceros`). FK desde `helpdesk.casos.contacto_id` y `helpdesk.casos_contactos.contacto_id`.
   - Endpoint: `GET/POST/PUT/DELETE /api/generales/contactos`
   - Permisos: `helpdesk.casos.ver` (lectura), `helpdesk.casos.gestionar` (escritura)
   - Anteriormente en `helpdesk.contactos`, migrado a `generales.contactos` para uso cross-module (helpdesk + CRM futuro).
@@ -229,9 +235,9 @@ Un gasto operativo (ej: "Transporte para mantenimiento") se puede vincular a un 
 - `vw_utilidad_items` suma `SUM(gastos.valor_total) WHERE venta_item_id IS NOT NULL` como `costo_directo` por línea
 
 ### Frontend: Gastos.tsx
-- Formulario incluye select anidado: "Factura de Venta" → "Item de Venta"
-- Si se selecciona item de venta, se limpia producto_id (y viceversa)
-- Guarda `venta_item_id` en POST y PUT
+- Tabla con filtros y filas clickeables para editar en modal
+- Botón "Producto" por fila → modal VinculoProductoModal
+- El formulario de creación está en `/financiero/nuevo-gasto` (NuevoGasto.tsx)
 
 ### Frontend: VentasItems.tsx (página `/ventas-items`)
 - Columnas: Fecha, Venta, #, Descripción, Cliente, Cant, Vr Unit, Total, **Acción**
@@ -296,7 +302,7 @@ cd frontend && npm run dev
 docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp
 
 # Limpiar BD
-docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp -c "TRUNCATE TABLE facturacion.factura_archivos, facturacion.factura_impuestos, facturacion.factura_respuestas_dian, facturacion.ventas_items, facturacion.ventas, facturacion.terceros, compras.facturas_compra_archivos, compras.facturas_compra, gastos.gastos, inventario.salida_detalle, inventario.salidas, inventario.entradas, inventario.productos, inventario.categorias CASCADE;"
+docker exec -it maxan_db_dev psql -U maxan_user -d maxan_erp -c "TRUNCATE TABLE facturacion.factura_archivos, facturacion.factura_impuestos, facturacion.factura_respuestas_dian, facturacion.ventas_items, facturacion.ventas, generales.terceros, compras.facturas_compra_archivos, compras.facturas_compra, gastos.gastos, inventario.salida_detalle, inventario.salidas, inventario.entradas, inventario.productos, inventario.categorias CASCADE;"
 
 # Backup BD (dump completo: DROP+CREATE+INSERT, ejecutable en DBeaver)
 curl -H "Authorization: Bearer <token>" http://localhost:3000/api/backup/descargar -o backup.sql
@@ -328,7 +334,7 @@ docker exec -i maxan_db_dev psql -U maxan_user -d maxan_erp < backup.sql
 ### Schema `helpdesk` (db/16_helpdesk_schema.sql, db/17_helpdesk_atributos.sql)
 - **categorias_mantenimiento** — 7 categorías: Preventivo, Correctivo, Instalación, Diagnóstico, Remoto, Formateo, Redes
 - **recursos** — Equipos informáticos de clientes (Computador, Hosting, Office 365, Red, etc.)
-  - FK: `cliente_id` → `facturacion.terceros(id)`
+  - FK: `cliente_id` → `generales.terceros(id)`
   - `serial` UNIQUE para detección de duplicados
   - `tipo` FK → `helpdesk.tipos_recurso(nombre)` (tabla maestra, adminitrable desde `/nuevo-recurso`)
   - Columnas fijas: marca, modelo, serial, procesador, memoria_gb, almacenamiento_gb, sistema_operativo
@@ -342,7 +348,7 @@ docker exec -i maxan_db_dev psql -U maxan_user -d maxan_erp < backup.sql
 
 ### Seed desde Notion
 La migración `16_helpdesk_schema.sql` incluye:
-- 14 clientes como `facturacion.terceros` (Gestión Calidad, Transglobal, Montacargas, Promatel, etc.)
+- 14 clientes como `generales.terceros` (Gestión Calidad, Transglobal, Montacargas, Promatel, etc.)
 - 35+ recursos informáticos migrados desde la base de Notion "Recursos Informáticos"
 
 ### Backend — Rutas
@@ -438,3 +444,12 @@ La migración `16_helpdesk_schema.sql` incluye:
 - Guarda vía `PUT /api/helpdesk/recursos/:id` con todos los campos del recurso
 - Pestaña "Todos los Recursos" en `HelpdeskNav` visible siempre que se tenga `helpdesk.ver`, sin depender de cliente seleccionado
 - **Backend**: los endpoints `listar`, `obtener` y `detectarPC` usan `LEFT JOIN` en lugar de `JOIN` para incluir recursos sin cliente (`cliente_id IS NULL`)
+
+## Problemas resueltos (continuación)
+48. **Backup sin schema generales** — `SCHEMAS_TO_DROP` en `backup.js` no incluía `generales`, causando error al restaurar si la tabla `contactos` ya existía. Se agregó `"generales"` al array.
+49. **CasoDetalle null check** — `caso.cliente_id` podía ser null causando error TS. Se cambió a `caso?.cliente_id ?? null`.
+50. **Detectar PC 308 redirect** — el script PowerShell usaba `http://` porque nginx sobrescribía `X-Forwarded-Proto` con `$scheme` (http). Solución: `app.set('trust proxy', true)` en backend, prioridad a `x-forwarded-proto` header, nginx preserva header original del proxy externo, y variable de entorno `PUBLIC_URL` como override.
+51. **Terceros sin identificación** — `tipo_documento` y `numero_documento` eran obligatorios. Migración `24_terceros_documento_opcional.sql` los hace opcionales + índice parcial UNIQUE. Backend y frontend actualizados para permitir crear terceros solo con nombre.
+52. **Terceros movido a schema generales** — `facturacion.terceros` migrado a `generales.terceros` para consistencia cross-module. Schema `01_schema.sql` actualizado, 10 controladores backend corregidos (~37 sentencias SQL), script `db/migrar_terceros_a_generales.sql` para BD existentes.
+53. **Formulario de gasto movido a página separada** — el formulario "Nuevo Gasto" se eliminó de `Gastos.tsx` y se movió a `NuevoGasto.tsx` en `/financiero/nuevo-gasto` (bajo Layout financiero). La tabla de gastos ahora ocupa todo el alto sin scroll vertical. Botón "+ Nuevo Gasto" en el header. Sección Producto cambió de `<select>` a input búsqueda + lista filtrada que se repliega a badge al seleccionar. Formulario reorganizado en 4 secciones visuales con `border-b`.
+54. **Header financiero cambió "← Inicio" por "← Atrás"** — `components/Layout.tsx` ahora usa `navigate(-1)` en lugar de `navigate("/")` para mejor navegación contextual.

@@ -28,7 +28,7 @@ ON CONFLICT (nombre) DO NOTHING;
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS helpdesk.contactos (
   id SERIAL PRIMARY KEY,
-  cliente_id INTEGER REFERENCES facturacion.terceros(id) ON DELETE CASCADE,
+  cliente_id INTEGER REFERENCES generales.terceros(id) ON DELETE CASCADE,
   nombre VARCHAR(200) NOT NULL,
   telefono VARCHAR(50),
   email VARCHAR(200),
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS helpdesk.casos (
   descripcion TEXT,
   categoria_id INTEGER REFERENCES helpdesk.categorias_caso(id),
   recurso_id INTEGER REFERENCES helpdesk.recursos(id),
-  cliente_id INTEGER REFERENCES facturacion.terceros(id),
+  cliente_id INTEGER REFERENCES generales.terceros(id),
   contacto_id INTEGER REFERENCES helpdesk.contactos(id),
   tecnico_id INTEGER REFERENCES usuarios.usuarios(id),
   estado VARCHAR(20) DEFAULT 'Pendiente'

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
 import { usePermiso } from "../context/AuthContext";
 
@@ -184,6 +184,18 @@ export default function Productos() {
         </div>
       </div>
 
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-800">{filtrados.length} producto{filtrados.length !== 1 ? "s" : ""}</h2>
+        {puedeGestionar && (
+          <Link
+            to="/inventario/nuevo-producto"
+            className="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
+          >
+            + Nuevo Producto
+          </Link>
+        )}
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
         <table className="w-full text-sm">
           <thead>
@@ -223,7 +235,7 @@ export default function Productos() {
                   <td className="p-3">
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/financiero/inventario/movimientos?producto_id=${p.id}&nombre=${encodeURIComponent(p.nombre)}`); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/inventario/movimientos?producto_id=${p.id}&nombre=${encodeURIComponent(p.nombre)}`); }}
                       className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
                     >
                       Stock
@@ -244,96 +256,6 @@ export default function Productos() {
           </tbody>
         </table>
       </div>
-
-      {puedeGestionar && !editId && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Nuevo Producto</h2>
-          <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Código *</label>
-              <input
-                type="text"
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value)}
-                required
-                placeholder="Ej: PROD-001"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Nombre *</label>
-              <input
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                required
-                placeholder="Nombre del producto"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
-              <div className="flex gap-1">
-                <select
-                  value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
-                >
-                  <option value="">-- Sin categoría --</option>
-                  {categorias.map((c) => (
-                    <option key={c.id} value={c.nombre}>{c.nombre}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => { setNuevaCat(""); setCatError(""); setShowCatModal(true); }}
-                  title="Administrar categorías"
-                  className="px-2.5 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600"
-                >
-                  ⚙
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Unidad</label>
-              <select
-                value={unidad}
-                onChange={(e) => setUnidad(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="UND">Unidad (UND)</option>
-                <option value="NIU">Pieza (NIU)</option>
-                <option value="KGM">Kilogramo (KGM)</option>
-                <option value="LTR">Litro (LTR)</option>
-                <option value="MTR">Metro (MTR)</option>
-                <option value="MTK">Metro cuadrado (MTK)</option>
-                <option value="HUR">Hora (HUR)</option>
-                <option value="DAY">Día (DAY)</option>
-                <option value="MON">Mes (MON)</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2 pb-2">
-              <input
-                type="checkbox"
-                id="inventariable"
-                checked={inventariable}
-                onChange={(e) => setInventariable(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <label htmlFor="inventariable" className="text-sm text-gray-700">Inventariable</label>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={creando || !codigo.trim() || !nombre.trim()}
-                className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
-              >
-                {creando ? "Guardando..." : "Crear Producto"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {puedeGestionar && editId && editModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => limpiarForm()}>

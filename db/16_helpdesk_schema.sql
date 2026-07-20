@@ -28,7 +28,7 @@ INSERT INTO helpdesk.categorias_mantenimiento (nombre, color) VALUES
 -- ------------------------------------------------------------------
 CREATE TABLE helpdesk.recursos (
   id SERIAL PRIMARY KEY,
-  cliente_id INTEGER NOT NULL REFERENCES facturacion.terceros(id),
+  cliente_id INTEGER NOT NULL REFERENCES generales.terceros(id),
   nombre VARCHAR(200) NOT NULL,
   tipo VARCHAR(50) NOT NULL DEFAULT 'Computador'
     CHECK (tipo IN ('Computador', 'Hosting', 'Office 365', 'Red', 'Celular', 'Impresora', 'Servidor', 'UPS', 'Cámara', 'Otro')),
@@ -98,7 +98,7 @@ CREATE TABLE helpdesk.mantenimiento_detalles (
 -- ================================================================
 -- SEED: TERCEROS (clientes desde Notion)
 -- ================================================================
-INSERT INTO facturacion.terceros (tipo_documento, numero_documento, razon_social) VALUES
+INSERT INTO generales.terceros (tipo_documento, numero_documento, razon_social) VALUES
   ('NI', '900000001', 'Gestión Calidad'),
   ('NI', '900000002', 'Transglobal de Carga'),
   ('NI', '900000003', 'Montacargas y Transportes'),
@@ -120,15 +120,15 @@ ON CONFLICT (tipo_documento, numero_documento) DO NOTHING;
 -- ================================================================
 DO $$
 DECLARE
-  v_gestion_calidad   INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000001');
-  v_transglobal       INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000002');
-  v_montacargas       INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000003');
-  v_promatel          INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000004');
-  v_grupo_carpini     INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000005');
-  v_simbolo           INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000006');
-  v_bekko             INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000007');
-  v_m2_contable       INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000008');
-  v_ankaras           INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000009');
+  v_gestion_calidad   INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000001');
+  v_transglobal       INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000002');
+  v_montacargas       INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000003');
+  v_promatel          INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000004');
+  v_grupo_carpini     INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000005');
+  v_simbolo           INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000006');
+  v_bekko             INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000007');
+  v_m2_contable       INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000008');
+  v_ankaras           INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000009');
 BEGIN
 
   -- Gestión Calidad

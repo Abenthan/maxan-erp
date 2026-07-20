@@ -7,7 +7,7 @@ async function list(req, res) {
   const { q, tipo_documento, tipo } = req.query;
 
   try {
-    let sql = "SELECT * FROM facturacion.terceros WHERE 1=1";
+    let sql = "SELECT * FROM generales.terceros WHERE 1=1";
     const params = [];
     let idx = 1;
 
@@ -40,7 +40,7 @@ async function list(req, res) {
 async function get(req, res) {
   const pool = getPool(req);
   try {
-    const result = await pool.query("SELECT * FROM facturacion.terceros WHERE id = $1", [req.params.id]);
+    const result = await pool.query("SELECT * FROM generales.terceros WHERE id = $1", [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: "Tercero no encontrado" });
     res.json(result.rows[0]);
   } catch (error) {
@@ -68,7 +68,7 @@ async function create(req, res) {
       let queryText;
 
       if (tieneDoc) {
-        queryText = `INSERT INTO facturacion.terceros
+        queryText = `INSERT INTO generales.terceros
           (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
            razon_social, direccion, codigo_ciudad, ciudad, codigo_departamento,
            departamento, codigo_postal, pais, telefono, email, es_propio,
@@ -82,12 +82,12 @@ async function create(req, res) {
            departamento = EXCLUDED.departamento,
            telefono = EXCLUDED.telefono,
            email = EXCLUDED.email,
-           es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE facturacion.terceros.es_cliente END,
-           es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE facturacion.terceros.es_proveedor END,
+           es_cliente = CASE WHEN EXCLUDED.es_cliente THEN true ELSE generales.terceros.es_cliente END,
+           es_proveedor = CASE WHEN EXCLUDED.es_proveedor THEN true ELSE generales.terceros.es_proveedor END,
            updated_at = now()
        RETURNING *`;
       } else {
-        queryText = `INSERT INTO facturacion.terceros
+        queryText = `INSERT INTO generales.terceros
           (tipo_documento, numero_documento, digito_verificacion, tipo_persona,
            razon_social, direccion, codigo_ciudad, ciudad, codigo_departamento,
            departamento, codigo_postal, pais, telefono, email, es_propio,
@@ -118,12 +118,12 @@ async function update(req, res) {
   const fields = req.body;
 
   try {
-    const existente = await pool.query("SELECT * FROM facturacion.terceros WHERE id = $1", [id]);
+    const existente = await pool.query("SELECT * FROM generales.terceros WHERE id = $1", [id]);
     if (existente.rows.length === 0) return res.status(404).json({ error: "Tercero no encontrado" });
 
     const actualizado = { ...existente.rows[0], ...fields };
     const result = await pool.query(
-      `UPDATE facturacion.terceros SET
+      `UPDATE generales.terceros SET
         tipo_documento = $1, numero_documento = $2, digito_verificacion = $3,
         tipo_persona = $4, razon_social = $5, direccion = $6,
         codigo_ciudad = $7, ciudad = $8, codigo_departamento = $9,
@@ -159,7 +159,7 @@ async function remove(req, res) {
   }
   const pool = getPool(req);
   try {
-    const result = await pool.query("DELETE FROM facturacion.terceros WHERE id = $1 RETURNING *", [req.params.id]);
+    const result = await pool.query("DELETE FROM generales.terceros WHERE id = $1 RETURNING *", [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: "Tercero no encontrado" });
     res.json({ success: true, eliminado: result.rows[0] });
   } catch (error) {

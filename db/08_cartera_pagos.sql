@@ -29,7 +29,7 @@ ON CONFLICT (nombre) DO NOTHING;
 -- ---------------------------------------------------------------------
 CREATE TABLE cartera.pagos (
     id              SERIAL PRIMARY KEY,
-    cliente_id      INT NOT NULL REFERENCES facturacion.terceros(id),
+    cliente_id      INT NOT NULL REFERENCES generales.terceros(id),
     medio_pago_id   INT REFERENCES cartera.medios_pago(id),
     referencia      VARCHAR(100),
     fecha_pago      DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -164,7 +164,7 @@ SELECT
         ELSE 999
     END AS dias_vencida
 FROM facturacion.ventas v
-JOIN facturacion.terceros t ON t.id = v.receptor_id
+JOIN generales.terceros t ON t.id = v.receptor_id
 WHERE v.estado NOT IN ('anulada', 'rechazada')
 ORDER BY v.fecha_vencimiento_pago NULLS LAST, v.fecha_emision DESC;
 
@@ -184,7 +184,7 @@ SELECT
     COALESCE(pa.total_aplicado, 0) AS total_aplicado,
     CASE WHEN COALESCE(pa.total_aplicado, 0) < p.valor_total THEN p.valor_total - COALESCE(pa.total_aplicado, 0) ELSE 0 END AS sin_aplicar
 FROM cartera.pagos p
-JOIN facturacion.terceros t ON t.id = p.cliente_id
+JOIN generales.terceros t ON t.id = p.cliente_id
 LEFT JOIN cartera.medios_pago mp ON mp.id = p.medio_pago_id
 LEFT JOIN (
     SELECT pago_id, COUNT(*) AS facturas_aplicadas, SUM(valor_aplicado) AS total_aplicado

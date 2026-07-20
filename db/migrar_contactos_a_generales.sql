@@ -9,7 +9,7 @@ CREATE SCHEMA IF NOT EXISTS generales;
 -- 2. Crear tabla generales.contactos (misma estructura)
 CREATE TABLE IF NOT EXISTS generales.contactos (
   id SERIAL PRIMARY KEY,
-  cliente_id INTEGER REFERENCES facturacion.terceros(id) ON DELETE CASCADE,
+  cliente_id INTEGER REFERENCES generales.terceros(id) ON DELETE CASCADE,
   nombre VARCHAR(200) NOT NULL,
   telefono VARCHAR(50),
   email VARCHAR(200),

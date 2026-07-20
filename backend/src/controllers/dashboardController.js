@@ -61,19 +61,19 @@ async function dashboard(req, res) {
         SELECT v.receptor_id AS cliente_id, t.razon_social,
                COUNT(*)::int AS cantidad_facturas, COALESCE(SUM(v.valor_a_pagar),0) AS total_ventas
         FROM facturacion.ventas v
-        JOIN facturacion.terceros t ON t.id = v.receptor_id
+        JOIN generales.terceros t ON t.id = v.receptor_id
         ${ventasWhere}
         GROUP BY v.receptor_id, t.razon_social ORDER BY total_ventas DESC LIMIT 10
       `, params),
       pool.query(`
         SELECT v.id, v.numero_completo, v.fecha_emision, t.razon_social AS cliente, v.valor_a_pagar
         FROM facturacion.ventas v
-        JOIN facturacion.terceros t ON t.id = v.receptor_id
+        JOIN generales.terceros t ON t.id = v.receptor_id
         ${ventasWhere}
         ORDER BY v.fecha_emision DESC LIMIT 10
       `, params),
       pool.query(`
-        SELECT id, razon_social, numero_documento FROM facturacion.terceros
+        SELECT id, razon_social, numero_documento FROM generales.terceros
         WHERE es_cliente = true OR id IN (SELECT DISTINCT receptor_id FROM facturacion.ventas)
         ORDER BY razon_social
       `),

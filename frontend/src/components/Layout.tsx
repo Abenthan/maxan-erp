@@ -44,15 +44,6 @@ const ALL_GROUPS: NavGroup[] = [
       { to: "/financiero/cartera/retenciones", label: "Retenciones", icon: "🧾", permiso: "cartera.ver" },
     ],
   },
-  {
-    label: "INVENTARIO",
-    bg: "bg-emerald-50",
-    items: [
-      { to: "/financiero/productos", label: "Productos", icon: "📦", permiso: "productos.ver" },
-      { to: "/financiero/inventario", label: "Stock", icon: "📊", permiso: "inventario.ver" },
-      { to: "/financiero/inventario/movimientos", label: "Movimientos", icon: "🔄", permiso: "inventario.ver" },
-    ],
-  },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -142,8 +133,8 @@ export default function Layout({ children }: { children: ReactNode }) {
       <main className="flex-1 flex flex-col min-w-0">
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/")} className="text-sm text-gray-400 hover:text-gray-600">
-              ← Inicio
+            <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-gray-600">
+              ← Atrás
             </button>
             <span className="text-sm font-bold text-gray-700">Financiero</span>
           </div>

@@ -9,7 +9,7 @@
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS facturacion;
 
-CREATE TABLE IF NOT EXISTS facturacion.terceros (
+CREATE TABLE IF NOT EXISTS generales.terceros (
     id                  SERIAL PRIMARY KEY,
     tipo_documento      VARCHAR(5)   NOT NULL,
     numero_documento    VARCHAR(20)  NOT NULL,
@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS facturacion.terceros (
     UNIQUE (tipo_documento, numero_documento)
 );
 
-ALTER TABLE facturacion.terceros ADD COLUMN IF NOT EXISTS es_cliente BOOLEAN DEFAULT FALSE;
-ALTER TABLE facturacion.terceros ADD COLUMN IF NOT EXISTS es_proveedor BOOLEAN DEFAULT FALSE;
+ALTER TABLE generales.terceros ADD COLUMN IF NOT EXISTS es_cliente BOOLEAN DEFAULT FALSE;
+ALTER TABLE generales.terceros ADD COLUMN IF NOT EXISTS es_proveedor BOOLEAN DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS facturacion.ventas (
     id                          SERIAL PRIMARY KEY,
@@ -60,8 +60,8 @@ CREATE TABLE IF NOT EXISTS facturacion.ventas (
     valor_retencion_ica         NUMERIC(18,2) DEFAULT 0,
     valor_anticipos             NUMERIC(18,2) DEFAULT 0,
     valor_a_pagar               NUMERIC(18,2) NOT NULL,
-    emisor_id                   INT NOT NULL REFERENCES facturacion.terceros(id),
-    receptor_id                 INT NOT NULL REFERENCES facturacion.terceros(id),
+    emisor_id                   INT NOT NULL REFERENCES generales.terceros(id),
+    receptor_id                 INT NOT NULL REFERENCES generales.terceros(id),
     resolucion_numero           VARCHAR(50),
     resolucion_fecha_desde      DATE,
     resolucion_fecha_hasta      DATE,
@@ -159,9 +159,9 @@ CREATE TRIGGER trg_ventas_updated_at
     BEFORE UPDATE ON facturacion.ventas
     FOR EACH ROW EXECUTE FUNCTION facturacion.fn_set_updated_at();
 
-DROP TRIGGER IF EXISTS trg_terceros_updated_at ON facturacion.terceros;
+DROP TRIGGER IF EXISTS trg_terceros_updated_at ON generales.terceros;
 CREATE TRIGGER trg_terceros_updated_at
-    BEFORE UPDATE ON facturacion.terceros
+    BEFORE UPDATE ON generales.terceros
     FOR EACH ROW EXECUTE FUNCTION facturacion.fn_set_updated_at();
 
 CREATE SEQUENCE IF NOT EXISTS facturacion.ventas_manual_seq START 1;
@@ -187,8 +187,8 @@ CREATE TABLE IF NOT EXISTS compras.facturas_compra (
     valor_total_impuestos   NUMERIC(18,2) DEFAULT 0,
     valor_iva               NUMERIC(18,2) DEFAULT 0,
     valor_a_pagar           NUMERIC(18,2) NOT NULL,
-    proveedor_id            INT NOT NULL REFERENCES facturacion.terceros(id),
-    receptor_id             INT NOT NULL REFERENCES facturacion.terceros(id),
+    proveedor_id            INT NOT NULL REFERENCES generales.terceros(id),
+    receptor_id             INT NOT NULL REFERENCES generales.terceros(id),
     estado                  VARCHAR(20) DEFAULT 'recibida'
                              CHECK (estado IN ('recibida','pendiente_pago','pagada_parcial','pagada','anulada','rechazada')),
     created_at              TIMESTAMP DEFAULT now(),
@@ -230,7 +230,7 @@ ON CONFLICT (nombre) DO NOTHING;
 CREATE TABLE IF NOT EXISTS gastos.gastos (
     id                  SERIAL PRIMARY KEY,
     factura_compra_id   INT REFERENCES compras.facturas_compra(id) ON DELETE CASCADE,
-    proveedor_id        INT REFERENCES facturacion.terceros(id),
+    proveedor_id        INT REFERENCES generales.terceros(id),
     producto_id         INT REFERENCES inventario.productos(id),
     venta_item_id        INT REFERENCES facturacion.ventas_items(id),
     descripcion          TEXT NOT NULL,
@@ -392,7 +392,7 @@ ON CONFLICT (nombre) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS cartera.pagos (
     id              SERIAL PRIMARY KEY,
-    cliente_id      INT NOT NULL REFERENCES facturacion.terceros(id),
+    cliente_id      INT NOT NULL REFERENCES generales.terceros(id),
     medio_pago_id   INT REFERENCES cartera.medios_pago(id),
     referencia      VARCHAR(100),
     fecha_pago      DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -477,7 +477,7 @@ SELECT v.id AS venta_id, v.numero_completo, v.fecha_emision, v.fecha_vencimiento
          WHEN (CURRENT_DATE - v.fecha_vencimiento_pago) <= 90 THEN 90
          ELSE 999 END AS dias_vencida
 FROM facturacion.ventas v
-JOIN facturacion.terceros t ON t.id = v.receptor_id
+JOIN generales.terceros t ON t.id = v.receptor_id
 WHERE v.estado NOT IN ('anulada', 'rechazada')
 ORDER BY v.fecha_vencimiento_pago NULLS LAST, v.fecha_emision DESC;
 
@@ -489,7 +489,7 @@ SELECT p.id, p.fecha_pago, p.valor_total, p.referencia, p.anulado,
     COALESCE(pa.total_aplicado, 0) AS total_aplicado,
     CASE WHEN COALESCE(pa.total_aplicado, 0) < p.valor_total THEN p.valor_total - COALESCE(pa.total_aplicado, 0) ELSE 0 END AS sin_aplicar
 FROM cartera.pagos p
-JOIN facturacion.terceros t ON t.id = p.cliente_id
+JOIN generales.terceros t ON t.id = p.cliente_id
 LEFT JOIN cartera.medios_pago mp ON mp.id = p.medio_pago_id
 LEFT JOIN (SELECT pago_id, COUNT(*) AS facturas_aplicadas, SUM(valor_aplicado) AS total_aplicado FROM cartera.pago_aplicaciones GROUP BY pago_id) pa ON pa.pago_id = p.id
 ORDER BY p.fecha_pago DESC, p.id DESC;
@@ -589,7 +589,7 @@ ON CONFLICT (nombre) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS helpdesk.recursos (
   id SERIAL PRIMARY KEY,
-  cliente_id INTEGER NOT NULL REFERENCES facturacion.terceros(id),
+  cliente_id INTEGER NOT NULL REFERENCES generales.terceros(id),
   nombre VARCHAR(200) NOT NULL,
   tipo VARCHAR(50) NOT NULL DEFAULT 'Computador',
   marca VARCHAR(100),
@@ -672,7 +672,7 @@ CREATE SCHEMA IF NOT EXISTS generales;
 
 CREATE TABLE IF NOT EXISTS generales.contactos (
   id SERIAL PRIMARY KEY,
-  cliente_id INTEGER REFERENCES facturacion.terceros(id) ON DELETE CASCADE,
+  cliente_id INTEGER REFERENCES generales.terceros(id) ON DELETE CASCADE,
   nombre VARCHAR(200) NOT NULL,
   telefono VARCHAR(50),
   email VARCHAR(200),
@@ -697,7 +697,7 @@ CREATE TABLE IF NOT EXISTS helpdesk.casos (
   descripcion TEXT,
   categoria_id INTEGER REFERENCES helpdesk.categorias_caso(id),
   recurso_id INTEGER REFERENCES helpdesk.recursos(id),
-  cliente_id INTEGER REFERENCES facturacion.terceros(id),
+  cliente_id INTEGER REFERENCES generales.terceros(id),
   contacto_id INTEGER REFERENCES generales.contactos(id),
   tecnico_id INTEGER REFERENCES usuarios.usuarios(id),
   estado VARCHAR(20) DEFAULT 'Pendiente'
@@ -759,7 +759,7 @@ ON CONFLICT DO NOTHING;
 -- ============================================================
 -- 8. SEED: TERCEROS desde Notion
 -- ============================================================
-INSERT INTO facturacion.terceros (tipo_documento, numero_documento, razon_social) VALUES
+INSERT INTO generales.terceros (tipo_documento, numero_documento, razon_social) VALUES
   ('NI', '900000001', 'Gestión Calidad'),
   ('NI', '900000002', 'Transglobal de Carga'),
   ('NI', '900000003', 'Montacargas y Transportes'),
@@ -781,15 +781,15 @@ ON CONFLICT (tipo_documento, numero_documento) DO NOTHING;
 -- ============================================================
 DO $$
 DECLARE
-  v_gestion_calidad   INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000001');
-  v_transglobal       INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000002');
-  v_montacargas       INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000003');
-  v_promatel          INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000004');
-  v_grupo_carpini     INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000005');
-  v_simbolo           INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000006');
-  v_bekko             INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000007');
-  v_m2_contable       INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000008');
-  v_ankaras           INT := (SELECT id FROM facturacion.terceros WHERE numero_documento = '900000009');
+  v_gestion_calidad   INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000001');
+  v_transglobal       INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000002');
+  v_montacargas       INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000003');
+  v_promatel          INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000004');
+  v_grupo_carpini     INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000005');
+  v_simbolo           INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000006');
+  v_bekko             INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000007');
+  v_m2_contable       INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000008');
+  v_ankaras           INT := (SELECT id FROM generales.terceros WHERE numero_documento = '900000009');
 BEGIN
   INSERT INTO helpdesk.recursos (cliente_id, nombre, tipo, marca, modelo, serial, descripcion) VALUES
     (v_gestion_calidad, 'Lenovo Andres Cortez',   'Computador', 'Lenovo', 'IdeaPad 3 15IRH10', NULL, NULL),
@@ -841,8 +841,8 @@ SELECT v.id, v.numero_completo, v.cufe, v.fecha_emision, v.fecha_vencimiento,
     v.valor_a_pagar, v.estado, v.codigo_respuesta_dian, v.estado_validacion_dian,
     v.observaciones
 FROM facturacion.ventas v
-JOIN facturacion.terceros e ON e.id = v.emisor_id
-JOIN facturacion.terceros r ON r.id = v.receptor_id;
+JOIN generales.terceros e ON e.id = v.emisor_id
+JOIN generales.terceros r ON r.id = v.receptor_id;
 
 DROP VIEW IF EXISTS facturacion.vw_utilidad_items;
 CREATE OR REPLACE VIEW facturacion.vw_utilidad_items AS

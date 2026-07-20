@@ -15,7 +15,7 @@ exports.listar = async (req, res) => {
              FROM helpdesk.casos c
              LEFT JOIN helpdesk.categorias_caso cat ON cat.id = c.categoria_id
              LEFT JOIN usuarios.usuarios u ON u.id = c.tecnico_id
-             LEFT JOIN facturacion.terceros t ON t.id = c.cliente_id
+             LEFT JOIN generales.terceros t ON t.id = c.cliente_id
              WHERE 1=1`;
   const params = [];
   if (estado) { params.push(estado); sql += ` AND c.estado = $${params.length}`; }
@@ -51,7 +51,7 @@ exports.obtener = async (req, res) => {
        FROM helpdesk.casos c
        LEFT JOIN helpdesk.categorias_caso cat ON cat.id = c.categoria_id
        LEFT JOIN usuarios.usuarios u ON u.id = c.tecnico_id
-       LEFT JOIN facturacion.terceros t ON t.id = c.cliente_id
+       LEFT JOIN generales.terceros t ON t.id = c.cliente_id
        LEFT JOIN generales.contactos con ON con.id = c.contacto_id
        WHERE c.id = $1`,
       [req.params.id]

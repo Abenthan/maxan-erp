@@ -54,6 +54,7 @@ export default function VentasItems() {
 
   const [modalItem, setModalItem] = useState<VentaItem | null>(null);
   const [prodSeleccionado, setProdSeleccionado] = useState("");
+  const [busquedaProducto, setBusquedaProducto] = useState("");
   const [guardandoProd, setGuardandoProd] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
@@ -119,6 +120,7 @@ export default function VentasItems() {
   function abrirModalProducto(item: VentaItem) {
     setModalItem(item);
     setProdSeleccionado(item.producto_id ? String(item.producto_id) : "");
+    setBusquedaProducto("");
     setMensaje(null);
   }
 
@@ -298,44 +300,82 @@ export default function VentasItems() {
 
       {modalItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { if (!guardandoProd) setModalItem(null); }}>
-          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-lg mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               {modalItem.producto_id ? "Cambiar producto" : "Asignar producto"}
             </h3>
 
-            <div className="mb-4">
-              <p className="text-sm text-gray-500 mb-2">
-                Item: <span className="font-medium text-gray-800">{modalItem.descripcion}</span>
-              </p>
-              <p className="text-sm text-gray-500 mb-2">
-                Venta: <span className="font-medium text-gray-800">{modalItem.numero_completo}</span> — {modalItem.cliente}
-              </p>
-              <p className="text-sm text-gray-500">
-                Cantidad: <span className="font-medium text-gray-800">{Number(modalItem.cantidad).toLocaleString("es-CO")}</span>
-              </p>
-            </div>
-
-            <div className="mb-1">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Producto</label>
-              <select
-                value={prodSeleccionado}
-                onChange={(e) => setProdSeleccionado(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">-- Seleccionar --</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>[{p.codigo}] {p.nombre}</option>
-                ))}
-              </select>
+            <div className="mb-4 text-sm text-gray-500 space-y-1">
+              <p>Item: <span className="font-medium text-gray-800">{modalItem.descripcion}</span></p>
+              <p>Venta: <span className="font-medium text-gray-800">{modalItem.numero_completo}</span> — {modalItem.cliente}</p>
+              <p>Cantidad: <span className="font-medium text-gray-800">{Number(modalItem.cantidad).toLocaleString("es-CO")}</span></p>
             </div>
 
             {modalItem.producto_id && (
-              <p className="text-xs text-gray-400 mt-1">
-                Producto actual: {productoNombre(modalItem)} {modalItem.consumido ? "(consumido)" : ""}
-              </p>
+              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center justify-between">
+                <span>
+                  Producto actual: {productoNombre(modalItem)} {modalItem.consumido ? "(consumido)" : ""}
+                </span>
+              </div>
             )}
 
-            <div className="flex justify-end gap-3 mt-6">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Producto</label>
+            <input
+              type="text"
+              value={busquedaProducto}
+              onChange={(e) => setBusquedaProducto(e.target.value)}
+              placeholder="Buscar producto por nombre o código..."
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+              autoFocus
+            />
+
+            <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg min-h-0 max-h-52">
+              {(() => {
+                const q = busquedaProducto.toLowerCase();
+                const filtrados = !busquedaProducto
+                  ? productos
+                  : productos.filter((p) =>
+                      p.nombre.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q)
+                    );
+                return filtrados.length === 0 ? (
+                  <p className="p-4 text-sm text-gray-400 text-center">No se encontraron productos</p>
+                ) : (
+                  filtrados.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setProdSeleccionado(String(p.id))}
+                      className={`w-full text-left px-4 py-2.5 text-sm border-b border-gray-100 hover:bg-blue-50 transition-colors flex items-center gap-3 ${
+                        String(p.id) === prodSeleccionado ? "bg-blue-100 font-semibold" : ""
+                      }`}
+                    >
+                      <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        String(p.id) === prodSeleccionado ? "border-blue-600 bg-blue-600" : "border-gray-300"
+                      }`}>
+                        {String(p.id) === prodSeleccionado && (
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className="text-gray-500 font-mono text-xs">{p.codigo}</span>
+                      <span className="text-gray-800">{p.nombre}</span>
+                    </button>
+                  ))
+                );
+              })()}
+            </div>
+
+            {prodSeleccionado && (() => {
+              const sel = productos.find((p) => String(p.id) === prodSeleccionado);
+              return sel ? (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                  Seleccionado: <strong>{sel.codigo}</strong> — {sel.nombre}
+                </div>
+              ) : null;
+            })()}
+
+            <div className="flex justify-end gap-3 mt-4">
               <button
                 type="button"
                 onClick={() => setModalItem(null)}
@@ -348,7 +388,7 @@ export default function VentasItems() {
                 type="button"
                 onClick={guardarProducto}
                 disabled={guardandoProd || !prodSeleccionado}
-                className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
               >
                 {guardandoProd ? "Guardando..." : modalItem.consumido ? "Cambiar y consumir" : "Asignar y consumir"}
               </button>

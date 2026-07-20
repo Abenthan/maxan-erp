@@ -13,7 +13,7 @@ async function listItems(req, res) {
              CASE WHEN s.id IS NOT NULL THEN true ELSE false END AS consumido
       FROM facturacion.ventas_items vi
       JOIN facturacion.ventas v ON v.id = vi.venta_id
-      LEFT JOIN facturacion.terceros t ON t.id = v.receptor_id
+      LEFT JOIN generales.terceros t ON t.id = v.receptor_id
       LEFT JOIN inventario.salidas s ON s.factura_item_id = vi.id
       WHERE 1=1`;
     const params = [];
@@ -98,7 +98,7 @@ async function create(req, res) {
     await client.query("BEGIN");
 
     const upsertQ = `
-      INSERT INTO facturacion.terceros
+      INSERT INTO generales.terceros
         (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
       VALUES ($1,$2,$3,$4,$5,$6,$7,true)
       ON CONFLICT (tipo_documento, numero_documento)
@@ -124,7 +124,7 @@ async function create(req, res) {
     const receptorId = receptorResult.rows[0].id;
 
     const emisorResult = await client.query(
-      `SELECT id FROM facturacion.terceros WHERE es_propio = true LIMIT 1`
+      `SELECT id FROM generales.terceros WHERE es_propio = true LIMIT 1`
     );
     if (emisorResult.rows.length === 0) {
       await client.query("ROLLBACK");
@@ -211,7 +211,7 @@ async function getById(req, res) {
       `SELECT v.*, t.razon_social, t.numero_documento, t.tipo_documento,
               t.direccion, t.ciudad
        FROM facturacion.ventas v
-       JOIN facturacion.terceros t ON t.id = v.receptor_id
+       JOIN generales.terceros t ON t.id = v.receptor_id
        WHERE v.id = $1`,
       [id]
     );
@@ -270,7 +270,7 @@ async function update(req, res) {
     await client.query("BEGIN");
 
     const upsertQ = `
-      INSERT INTO facturacion.terceros
+      INSERT INTO generales.terceros
         (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
       VALUES ($1,$2,$3,$4,$5,$6,$7,true)
       ON CONFLICT (tipo_documento, numero_documento)
