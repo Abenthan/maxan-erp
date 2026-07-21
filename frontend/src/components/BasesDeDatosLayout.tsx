@@ -54,8 +54,8 @@ export default function BasesDeDatosLayout({ children }: { children: ReactNode }
       <main className="flex-1 flex flex-col min-w-0">
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/")} className="text-sm text-gray-400 hover:text-gray-600">
-              ← Inicio
+            <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-gray-600">
+              ← Atrás
             </button>
             <span className="text-sm font-bold text-gray-700">Bases de Datos</span>
           </div>

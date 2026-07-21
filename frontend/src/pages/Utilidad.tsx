@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useApi } from "../context/ApiContext";
 
-interface ProductoUtilidad {
-  producto_id: number;
-  codigo: string;
-  nombre: string;
-  categoria: string;
-  costo_adquisiciones: string;
-  ingreso_ventas: string;
-  otros_costos: string;
-  utilidad: string;
+interface FacturaUtilidad {
+  id: number;
+  numero_completo: string;
+  fecha_emision: string;
+  cliente: string;
+  total_ingresos: number;
+  total_costo_inventario: number;
+  total_costo_directo: number;
+  total_utilidad: number;
 }
 
 interface LineaUtilidad {
@@ -47,198 +47,258 @@ function formatCurrency(n: number): string {
 
 export default function Utilidad() {
   const api = useApi();
-  const [tab, setTab] = useState<"productos" | "factura">("productos");
-  const [productos, setProductos] = useState<ProductoUtilidad[]>([]);
-  const [productosLoading, setProductosLoading] = useState(false);
-  const [productosError, setProductosError] = useState("");
-
-  const [facturaId, setFacturaId] = useState("");
+  const [facturas, setFacturas] = useState<FacturaUtilidad[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [facturaData, setFacturaData] = useState<UtilidadFactura | null>(null);
   const [facturaLoading, setFacturaLoading] = useState(false);
   const [facturaError, setFacturaError] = useState("");
+  const [sortKey, setSortKey] = useState("fecha_emision");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const sortedFacturas = useMemo(() => {
+    const arr = [...facturas];
+    arr.sort((a, b) => {
+      const aVal = a[sortKey as keyof FacturaUtilidad] ?? "";
+      const bVal = b[sortKey as keyof FacturaUtilidad] ?? "";
+      let cmp = 0;
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        cmp = aVal.localeCompare(bVal);
+      } else {
+        cmp = (aVal as number) - (bVal as number);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [facturas, sortKey, sortDir]);
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  function SortArrow({ col }: { col: string }) {
+    if (sortKey !== col) return <span className="text-gray-300 ml-1">↕</span>;
+    return <span className="text-blue-600 ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  }
+
+  const cargarFacturas = useCallback((q: string) => {
+    setLoading(true);
+    setError("");
+    api.get<FacturaUtilidad[]>(`/facturacion/utilidad/facturas?q=${encodeURIComponent(q)}`)
+      .then(setFacturas)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [api]);
 
   useEffect(() => {
-    if (tab === "productos" && productos.length === 0 && !productosLoading) {
-      setProductosLoading(true);
-      setProductosError("");
-      api.get<ProductoUtilidad[]>("/facturacion/utilidad/productos")
-        .then(setProductos)
-        .catch((e) => setProductosError(e.message))
-        .finally(() => setProductosLoading(false));
-    }
-  }, [tab]);
+    cargarFacturas("");
+  }, [cargarFacturas]);
 
-  const cargarFactura = () => {
-    if (!facturaId.trim()) return;
+  const seleccionarFactura = (id: number) => {
+    setSelectedId(id);
     setFacturaLoading(true);
     setFacturaError("");
     setFacturaData(null);
-    api.get<UtilidadFactura>(`/facturacion/${facturaId.trim()}/utilidad`)
+    api.get<UtilidadFactura>(`/facturacion/${id}/utilidad`)
       .then(setFacturaData)
       .catch((e) => setFacturaError(e.message))
       .finally(() => setFacturaLoading(false));
   };
 
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Utilidad</h1>
+  const volver = () => {
+    setSelectedId(null);
+    setFacturaData(null);
+  };
 
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
-        <button
-          onClick={() => setTab("productos")}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${tab === "productos" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Por Producto
-        </button>
-        <button
-          onClick={() => setTab("factura")}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${tab === "factura" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Por Factura
-        </button>
-      </div>
-
-      {tab === "productos" && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {productosLoading ? (
-            <p className="p-6 text-gray-500">Cargando...</p>
-          ) : productosError ? (
-            <p className="p-6 text-red-600">{productosError}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b text-left">
-                    <th className="p-3 font-semibold text-gray-600">Código</th>
-                    <th className="p-3 font-semibold text-gray-600">Nombre</th>
-                    <th className="p-3 font-semibold text-gray-600">Categoría</th>
-                    <th className="p-3 font-semibold text-gray-600 text-right">Costo Adq.</th>
-                    <th className="p-3 font-semibold text-gray-600 text-right">Ingreso Ventas</th>
-                    <th className="p-3 font-semibold text-gray-600 text-right">Otros Costos</th>
-                    <th className="p-3 font-semibold text-gray-600 text-right">Utilidad</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productos.length === 0 ? (
-                    <tr><td colSpan={7} className="p-8 text-center text-gray-400">Sin datos</td></tr>
-                  ) : (
-                    productos.map((p) => {
-                      const util = Number(p.utilidad);
-                      return (
-                        <tr key={p.producto_id} className="border-b hover:bg-gray-50">
-                          <td className="p-3 text-gray-500">{p.codigo}</td>
-                          <td className="p-3 font-medium">{p.nombre}</td>
-                          <td className="p-3 text-gray-500">{p.categoria || "-"}</td>
-                          <td className="p-3 text-right">{formatCurrency(Number(p.costo_adquisiciones))}</td>
-                          <td className="p-3 text-right">{formatCurrency(Number(p.ingreso_ventas))}</td>
-                          <td className="p-3 text-right">{formatCurrency(Number(p.otros_costos))}</td>
-                          <td className={`p-3 text-right font-semibold ${util >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {formatCurrency(util)}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab === "factura" && (
+  if (selectedId) {
+    if (facturaLoading) {
+      return (
         <div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-            <div className="flex items-end gap-3">
-              <div className="flex-1 max-w-xs">
-                <label className="block text-xs font-medium text-gray-500 mb-1">ID o N° de Factura</label>
-                <input
-                  type="text"
-                  value={facturaId}
-                  onChange={(e) => setFacturaId(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && cargarFactura()}
-                  placeholder="Ej: 123"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <button
-                onClick={cargarFactura}
-                disabled={facturaLoading || !facturaId.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {facturaLoading ? "Cargando..." : "Consultar"}
-              </button>
+          <div className="flex items-center gap-3 mb-6">
+            <button onClick={volver} className="text-sm text-blue-600 hover:text-blue-800 font-medium">← Volver</button>
+            <h1 className="text-2xl font-bold text-gray-900">Cargando...</h1>
+          </div>
+        </div>
+      );
+    }
+    if (facturaError) {
+      return (
+        <div>
+          <div className="flex items-center gap-3 mb-6">
+            <button onClick={volver} className="text-sm text-blue-600 hover:text-blue-800 font-medium">← Volver</button>
+            <h1 className="text-2xl font-bold text-gray-900">Error</h1>
+          </div>
+          <p className="text-red-600">{facturaError}</p>
+        </div>
+      );
+    }
+    if (!facturaData) return null;
+
+    const { factura, resumen, lineas } = facturaData;
+    return (
+      <div>
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={volver} className="text-sm text-blue-600 hover:text-blue-800 font-medium">← Volver</button>
+          <h1 className="text-2xl font-bold text-gray-900">Utilidad - {factura.numero_completo}</h1>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="text-xs text-gray-500 mb-1">Factura</div>
+            <div className="font-semibold">{factura.numero_completo}</div>
+            <div className="text-xs text-gray-400">{facturaData.factura.id}</div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="text-xs text-gray-500 mb-1">Ingresos</div>
+            <div className="font-semibold text-blue-600">{formatCurrency(resumen.total_ingresos)}</div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="text-xs text-gray-500 mb-1">Costos</div>
+            <div className="font-semibold text-orange-600">
+              {formatCurrency(resumen.total_costo_inventario)} + {formatCurrency(resumen.total_costo_directo)}
+            </div>
+            <div className="text-xs text-gray-400">Inv. + Directos</div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="text-xs text-gray-500 mb-1">Utilidad</div>
+            <div className={`font-semibold ${resumen.total_utilidad >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {formatCurrency(resumen.total_utilidad)}
             </div>
           </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="text-xs text-gray-500 mb-1">Margen</div>
+            <div className={`font-semibold ${resumen.margen_porcentaje >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {resumen.margen_porcentaje}%
+            </div>
+          </div>
+        </div>
 
-          {facturaError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{facturaError}</div>
-          )}
-
-          {facturaData && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                  <div className="text-xs text-gray-500 mb-1">Factura</div>
-                  <div className="font-semibold">{facturaData.factura.numero_completo}</div>
-                </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                  <div className="text-xs text-gray-500 mb-1">Ingresos</div>
-                  <div className="font-semibold text-blue-600">{formatCurrency(facturaData.resumen.total_ingresos)}</div>
-                </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                  <div className="text-xs text-gray-500 mb-1">Costos</div>
-                  <div className="font-semibold text-orange-600">{formatCurrency(facturaData.resumen.total_costos)}</div>
-                </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                  <div className="text-xs text-gray-500 mb-1">Utilidad</div>
-                  <div className={`font-semibold ${facturaData.resumen.total_utilidad >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {formatCurrency(facturaData.resumen.total_utilidad)}
-                  </div>
-                </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                  <div className="text-xs text-gray-500 mb-1">Margen</div>
-                  <div className={`font-semibold ${facturaData.resumen.margen_porcentaje >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {facturaData.resumen.margen_porcentaje}%
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b text-left">
-                        <th className="p-3 font-semibold text-gray-600">#</th>
-                        <th className="p-3 font-semibold text-gray-600">Descripción</th>
-                        <th className="p-3 font-semibold text-gray-600 text-right">Ingreso</th>
-                        <th className="p-3 font-semibold text-gray-600 text-right">Costo Inventario</th>
-                        <th className="p-3 font-semibold text-gray-600 text-right">Costo Directo</th>
-                        <th className="p-3 font-semibold text-gray-600 text-right">Utilidad</th>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b text-left">
+                  <th className="p-3 font-semibold text-gray-600">#</th>
+                  <th className="p-3 font-semibold text-gray-600">Descripción</th>
+                  <th className="p-3 font-semibold text-gray-600 text-right">Ingreso</th>
+                  <th className="p-3 font-semibold text-gray-600 text-right">Costo Inventario</th>
+                  <th className="p-3 font-semibold text-gray-600 text-right">Costo Directo</th>
+                  <th className="p-3 font-semibold text-gray-600 text-right">Utilidad</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineas.length === 0 ? (
+                  <tr><td colSpan={6} className="p-8 text-center text-gray-400">Sin datos</td></tr>
+                ) : (
+                  lineas.map((l, i) => {
+                    const util = Number(l.utilidad);
+                    return (
+                      <tr key={l.venta_item_id} className="border-b hover:bg-gray-50">
+                        <td className="p-3 text-gray-500">{i + 1}</td>
+                        <td className="p-3">{l.descripcion}</td>
+                        <td className="p-3 text-right">{formatCurrency(Number(l.valor_linea))}</td>
+                        <td className="p-3 text-right">{formatCurrency(Number(l.costo_inventario))}</td>
+                        <td className="p-3 text-right">{formatCurrency(Number(l.costo_directo))}</td>
+                        <td className={`p-3 text-right font-semibold ${util >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {formatCurrency(util)}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {facturaData.lineas.map((l, i) => {
-                        const util = Number(l.utilidad);
-                        return (
-                          <tr key={l.venta_item_id} className="border-b hover:bg-gray-50">
-                            <td className="p-3 text-gray-500">{i + 1}</td>
-                            <td className="p-3">{l.descripcion}</td>
-                            <td className="p-3 text-right">{formatCurrency(Number(l.valor_linea))}</td>
-                            <td className="p-3 text-right">{formatCurrency(Number(l.costo_inventario))}</td>
-                            <td className="p-3 text-right">{formatCurrency(Number(l.costo_directo))}</td>
-                            <td className={`p-3 text-right font-semibold ${util >= 0 ? "text-green-600" : "text-red-600"}`}>
-                              {formatCurrency(util)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Utilidad por Factura</h1>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+        <div className="flex items-end gap-3">
+          <div className="flex-1 max-w-sm">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Buscar factura</label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && cargarFacturas(search)}
+              placeholder="N° de factura o cliente..."
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <button
+            onClick={() => cargarFacturas(search)}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+          >
+            Buscar
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="text-gray-500">Cargando...</p>
+      ) : error ? (
+        <p className="text-red-600">{error}</p>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b text-left">
+                  <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("numero_completo")}>N° Factura <SortArrow col="numero_completo" /></th>
+                  <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("fecha_emision")}>Fecha <SortArrow col="fecha_emision" /></th>
+                  <th className="p-3 font-semibold text-gray-600 cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("cliente")}>Cliente <SortArrow col="cliente" /></th>
+                  <th className="p-3 font-semibold text-gray-600 text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("total_ingresos")}>Ingresos <SortArrow col="total_ingresos" /></th>
+                  <th className="p-3 font-semibold text-gray-600 text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("total_costo_inventario")}>Costo Inv. <SortArrow col="total_costo_inventario" /></th>
+                  <th className="p-3 font-semibold text-gray-600 text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("total_costo_directo")}>Costo Directo <SortArrow col="total_costo_directo" /></th>
+                  <th className="p-3 font-semibold text-gray-600 text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("total_utilidad")}>Utilidad <SortArrow col="total_utilidad" /></th>
+                  <th className="p-3 font-semibold text-gray-600 text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleSort("margen")}>Margen <SortArrow col="margen" /></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedFacturas.length === 0 ? (
+                  <tr><td colSpan={8} className="p-8 text-center text-gray-400">Sin datos</td></tr>
+                ) : (
+                  sortedFacturas.map((f) => {
+                    const util = Number(f.total_utilidad);
+                    const margen = f.total_ingresos > 0 ? Math.round((util / f.total_ingresos) * 10000) / 100 : 0;
+                    return (
+                      <tr
+                        key={f.id}
+                        className="border-b hover:bg-blue-50 cursor-pointer"
+                        onClick={() => seleccionarFactura(f.id)}
+                      >
+                        <td className="p-3 font-medium text-blue-600">{f.numero_completo}</td>
+                        <td className="p-3 text-gray-500">{f.fecha_emision?.split("T")[0]}</td>
+                        <td className="p-3">{f.cliente || "-"}</td>
+                        <td className="p-3 text-right">{formatCurrency(f.total_ingresos)}</td>
+                        <td className="p-3 text-right text-orange-600">{formatCurrency(f.total_costo_inventario)}</td>
+                        <td className="p-3 text-right text-orange-600">{formatCurrency(f.total_costo_directo)}</td>
+                        <td className={`p-3 text-right font-semibold ${util >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {formatCurrency(util)}
+                        </td>
+                        <td className={`p-3 text-right font-semibold ${margen >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {margen}%
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -222,7 +222,7 @@ function App() {
             <Route path="/helpdesk/*" element={<HelpdeskProvider><HelpdeskRoutes /></HelpdeskProvider>} />
             <Route path="/configuracion/*" element={<HelpdeskProvider><ConfiguracionRoutes /></HelpdeskProvider>} />
             <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
-            <Route path="/nuevo-tercero" element={<ProtectedRoute permiso="terceros.gestionar"><NuevoTercero /></ProtectedRoute>} />
+            <Route path="/nuevo-tercero" element={<BasesDeDatosLayout><ProtectedRoute permiso="terceros.gestionar"><NuevoTercero /></ProtectedRoute></BasesDeDatosLayout>} />
 
             <Route path="/terceros" element={<HelpdeskProvider><HelpdeskLayout titulo="Clientes" color="bg-blue-600" mostrarCliente={false}><ProtectedRoute permiso="terceros.ver"><Terceros /></ProtectedRoute></HelpdeskLayout></HelpdeskProvider>} />
             <Route path="/recursos" element={<HelpdeskProvider><HelpdeskLayout titulo="Todos los Recursos" color="bg-amber-600" mostrarCliente={false}><div><HelpdeskNav /><ProtectedRoute permiso="helpdesk.ver"><RecursosGlobal /></ProtectedRoute></div></HelpdeskLayout></HelpdeskProvider>} />

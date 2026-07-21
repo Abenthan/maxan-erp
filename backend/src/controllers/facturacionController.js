@@ -62,4 +62,37 @@ async function utilidadProductos(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
-module.exports = { utilidad, utilidadProductos };
+
+async function utilidadFacturas(req, res) {
+  const pool = getPool(req);
+  const { q } = req.query;
+  try {
+    const result = await pool.query(
+      `SELECT
+        v.id,
+        v.numero_completo,
+        v.fecha_emision::text,
+        t.razon_social AS cliente,
+        v.valor_a_pagar::numeric AS total_ingresos,
+        COALESCE(SUM(ui.costo_inventario), 0)::numeric AS total_costo_inventario,
+        COALESCE(SUM(ui.costo_directo), 0)::numeric AS total_costo_directo,
+        COALESCE(SUM(ui.utilidad), 0)::numeric AS total_utilidad
+      FROM facturacion.ventas v
+      LEFT JOIN generales.terceros t ON t.id = v.receptor_id
+      LEFT JOIN facturacion.ventas_items fi ON fi.venta_id = v.id
+      LEFT JOIN facturacion.vw_utilidad_items ui ON ui.venta_item_id = fi.id
+      WHERE v.estado NOT IN ('anulada', 'rechazada')
+        AND ($1 = '' OR v.numero_completo ILIKE '%' || $1 || '%' OR t.razon_social ILIKE '%' || $1 || '%')
+      GROUP BY v.id, v.numero_completo, v.fecha_emision, t.razon_social, v.valor_a_pagar
+      ORDER BY v.fecha_emision DESC
+      LIMIT 200`,
+      [q || '']
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al consultar utilidad por facturas:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+module.exports = { utilidad, utilidadProductos, utilidadFacturas };

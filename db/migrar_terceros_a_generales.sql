@@ -69,6 +69,12 @@ DROP TRIGGER IF EXISTS trg_terceros_updated_at ON facturacion.terceros;
 -- Eliminar tabla antigua
 DROP TABLE IF EXISTS facturacion.terceros CASCADE;
 
+-- Recrear la secuencia porque el DROP CASCADE eliminó facturacion.terceros_id_seq
+-- (LIKE ... INCLUDING DEFAULTS copió el default apuntando a esa secuencia antigua)
+CREATE SEQUENCE IF NOT EXISTS generales.terceros_id_seq;
+ALTER TABLE generales.terceros ALTER COLUMN id SET DEFAULT nextval('generales.terceros_id_seq');
+SELECT setval('generales.terceros_id_seq', COALESCE((SELECT MAX(id) FROM generales.terceros), 1));
+
 -- Recrear FKs apuntando a generales.terceros
 ALTER TABLE facturacion.ventas      ADD CONSTRAINT ventas_emisor_id_fkey   FOREIGN KEY (emisor_id)   REFERENCES generales.terceros(id);
 ALTER TABLE facturacion.ventas      ADD CONSTRAINT ventas_receptor_id_fkey FOREIGN KEY (receptor_id) REFERENCES generales.terceros(id);
