@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
 
@@ -233,13 +234,39 @@ export default function NuevaVenta() {
     });
   }
 
-  function productosFiltrados(searchText: string): Product[] {
-    if (!searchText.trim()) return [];
-    const q = searchText.toLowerCase();
-    return productos.filter(
-      (p) => p.codigo.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q)
-    ).slice(0, 10);
-  }
+  const searchRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [activeSearchIdx, setActiveSearchIdx] = useState<number | null>(null);
+
+  const resultadosProductos = useMemo(() => {
+    if (activeSearchIdx === null) return { idx: -1, items: [] as Product[] };
+    const linea = lineas[activeSearchIdx];
+    if (!linea || linea.producto_id || !linea.searchText.trim()) return { idx: -1, items: [] };
+    const q = linea.searchText.toLowerCase();
+    return {
+      idx: activeSearchIdx,
+      items: productos.filter(
+        (p) => p.codigo.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q)
+      ).slice(0, 10),
+    };
+  }, [lineas, productos, activeSearchIdx]);
+
+  useEffect(() => {
+    if (resultadosProductos.items.length === 0) setActiveSearchIdx(null);
+  }, [resultadosProductos]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-search-dropdown]") &&
+          !target.closest("[data-search-input]")) {
+        setActiveSearchIdx(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+
 
   const total = lineas.reduce((s, l) => {
     const cant = parseFloat(l.cantidad) || 0;
@@ -465,7 +492,6 @@ export default function NuevaVenta() {
                   {lineas.map((l, idx) => {
                     const cant = parseFloat(l.cantidad) || 0;
                     const vr = parseFloat(l.valor_unitario) || 0;
-                    const resultados = productosFiltrados(l.searchText);
                     return (
                       <tr key={idx} className="border-b">
                         <td className="p-1">
@@ -505,8 +531,11 @@ export default function NuevaVenta() {
                           ) : (
                             <>
                               <input
+                                ref={(el) => { searchRefs.current[idx] = el; }}
                                 type="text"
                                 value={l.searchText}
+                                data-search-input
+                                onFocus={() => { if (l.searchText.trim()) setActiveSearchIdx(idx); }}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setLineas((prev) => {
@@ -514,26 +543,12 @@ export default function NuevaVenta() {
                                     copia[idx] = { ...copia[idx], searchText: val };
                                     return copia;
                                   });
+                                  setActiveSearchIdx(idx);
                                 }}
                                 placeholder="Buscar producto..."
                                 autoComplete="off"
                                 className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
-                              {resultados.length > 0 && (
-                                <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                  {resultados.map((p) => (
-                                    <button
-                                      key={p.id}
-                                      type="button"
-                                      onClick={() => seleccionarProducto(idx, p)}
-                                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-0"
-                                    >
-                                      <span className="font-medium">[{p.codigo}]</span> {p.nombre}
-                                      {p.inventariable && <span className="ml-2 text-xs text-emerald-600">· Inv</span>}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
                             </>
                           )}
                         </td>
@@ -601,7 +616,7 @@ export default function NuevaVenta() {
             </button>
             <button
               type="submit"
-              disabled={guardando || !cliente.trim() || !nit.trim() || total <= 0}
+              disabled={guardando || !cliente.trim() || !(nit ?? "").trim() || total <= 0}
               className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
             >
               {guardando ? (editandoId ? "Actualizando..." : "Guardando...") : (editandoId ? "Actualizar Venta" : "Guardar Venta")}
@@ -609,6 +624,60 @@ export default function NuevaVenta() {
           </div>
         </form>
       )}
+
+      {activeSearchIdx !== null && resultadosProductos.items.length > 0 && (
+        <DropdownPortal
+          inputEl={searchRefs.current[resultadosProductos.idx]}
+          items={resultadosProductos.items}
+          onSelect={(p) => {
+            seleccionarProducto(resultadosProductos.idx, p);
+            setActiveSearchIdx(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function DropdownPortal({ inputEl, items, onSelect }: {
+  inputEl: HTMLInputElement | null;
+  items: Product[];
+  onSelect: (p: Product) => void;
+}) {
+  const [style, setStyle] = useState<React.CSSProperties>({});
+
+  useEffect(() => {
+    if (!inputEl) return;
+    const rect = inputEl.getBoundingClientRect();
+    setStyle({
+      position: "fixed",
+      left: rect.left + "px",
+      top: rect.bottom + 4 + "px",
+      width: rect.width + "px",
+      zIndex: 9999,
+    });
+  }, [inputEl]);
+
+  if (!inputEl) return null;
+
+  return createPortal(
+    <div
+      data-search-dropdown
+      style={style}
+      className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+    >
+      {items.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          onClick={() => onSelect(p)}
+          className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-0"
+        >
+          <span className="font-medium">[{p.codigo}]</span> {p.nombre}
+          {p.inventariable && <span className="ml-2 text-xs text-emerald-600">· Inv</span>}
+        </button>
+      ))}
+    </div>,
+    document.body
   );
 }

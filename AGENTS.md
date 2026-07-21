@@ -14,7 +14,7 @@
 - `/configuracion/*` — Usuarios, roles y copia de seguridad
 - `/crm` — Placeholder
 - `/terceros` — Standalone, sin sidebar (usa HelpdeskLayout con header "Maxan ERP")
-- `/nuevo-tercero` — Standalone, sin sidebar (usa HelpdeskLayout)
+- `/nuevo-tercero` — Standalone, con sidebar teal (usa BasesDeDatosLayout)
 - `/financiero/nuevo-gasto` — Ruta bajo Layout financiero para crear gastos
 
 ## Sidebar Financiero (Layout.tsx)
@@ -53,7 +53,7 @@
   - Al guardar una compra, por cada línea crea un gasto en `gastos.gastos` y por cada impuesto (>0) crea un gasto adicional distribuido proporcionalmente según `item.valor_linea / subtotal_total`
 - **Inventario** — `routes/inventario.js` → `GET /api/inventario/stock`, `GET /api/inventario/movimientos/:producto_id`, `POST /api/inventario/consumir` (FIFO transaccional)
 - **Ventas** — `routes/ventas.js` → `GET /api/ventas/items`, `PUT /api/ventas/items/:id` (asignar producto_id), `POST /api/ventas` (crear), `GET /api/ventas/:id` (obtener con items), `PUT /api/ventas/:id` (editar solo si cufe IS NULL)
-- **Utilidad** — `routes/facturacion.js` → `GET /api/facturacion/:factura_id/utilidad`, `GET /api/facturacion/utilidad/productos`
+- **Utilidad** — `routes/facturacion.js` → `GET /api/facturacion/:factura_id/utilidad`, `GET /api/facturacion/utilidad/productos`, `GET /api/facturacion/utilidad/facturas?q=` (lista facturas con totales utilidad)
 - **Categorías** — `routes/categorias.js` → `GET/POST/DELETE /api/productos/categorias` (maestro de categorías)
 - **Dashboard** — `routes/dashboard.js` → `GET /api/dashboard` con filtros `?mes=&cliente_id=&factura_id=`
   - Retorna: resumen, ventas_por_mes, gastos_por_mes, gastos_por_clasificacion, top_clientes, ultimas_facturas, clientes, productos_utilidad
@@ -69,14 +69,14 @@
 - `pages/NuevaCompra.tsx` — Subir XML de compra con preview + botón guardar (paso doble: parsear → mostrar → guardar)
 - `pages/Inventario.tsx` — Stock desde `vw_stock_disponible`
 - `pages/VentasItems.tsx` — Items de venta con filtros, modal asignar producto con consumo FIFO, botones Ver, Gastos y Editar (solo para ventas sin factura, identificadas por `cufe IS NULL`)
-- `pages/Utilidad.tsx` — Dos tabs: Por Producto (tabla desde vw_utilidad_productos) y Por Factura (input ID + resumen + detalle líneas)
+- `pages/Utilidad.tsx` — Tab única "Por Factura": lista de todas las facturas con ingresos, costos y utilidad; búsqueda por N° factura o cliente; columnas ordenables clickeando encabezados; click en fila → detalle (cards resumen + tabla líneas)
 - `pages/Terceros.tsx` — `/terceros` CRUD completo con tabla (avatares por iniciales, badges Cliente/Proveedor), filtros búsqueda + tipo, fila clickeable → modal edición, botón Eliminar solo para admins (`usuarios.gestionar`)
 - `pages/NuevoTercero.tsx` — `/nuevo-tercero` Formulario para crear nuevo tercero. Ruta standalone fuera de financiero, accesible con solo `terceros.gestionar`
 - `pages/Cartera.tsx` — `/cartera` Tabla cartera activa con aging (días vencido coloreado, totales), filtro cliente como input texto (búsqueda en tiempo real por nombre/NIT), filtro estado, modal rápido para registrar pago con distribución por factura. Medio de pago limitado a Efectivo/Transferencia Bancaria, default Transferencia.
 - `pages/Pagos.tsx` — `/cartera/pagos` Historial de pagos recibidos. Click en fila activa → modal de edición (fecha, medio, referencia, observaciones) con PUT. Botón anular preservado.
 - `pages/NuevoPago.tsx` — `/cartera/nuevo-pago` Página dedicada paso a paso (cliente → facturas → confirmar)
 - `pages/Retenciones.tsx` — `/cartera/retenciones` Listado de retenciones realizadas con total acumulado
-- `pages/NuevaVenta.tsx` — `/nueva-venta` y `/nueva-venta/:id` (edición). Cliente default "Ventas sin factura" con CC 123456789. Campo Observaciones con auto-focus. Items con dos columnas: Código (input, al perder foco busca producto por código exacto) y Producto (autocomplete por código/nombre). Si el producto es inventariable, al crear consume inventario. En modo edición carga datos vía GET y guarda con PUT.
+- `pages/NuevaVenta.tsx` — `/nueva-venta` y `/nueva-venta/:id` (edición). Cliente default "Ventas sin factura" con CC 123456789. Campo Observaciones con auto-focus. Items con dos columnas: Código (input, al perder foco busca producto por código exacto) y Producto (autocomplete por código/nombre, dropdown via `createPortal` para evitar clipping por overflow). Si el producto es inventariable, al crear consume inventario. En modo edición carga datos vía GET y guarda con PUT.
 - `pages/NuevoGasto.tsx` — `/financiero/nuevo-gasto` Formulario para crear gastos, organizado en 4 secciones: Descripción del gasto, Clasificación, Producto (input búsqueda + lista filtrada con selección que se repliega a badge), Factura de Venta (opcional). Ruta bajo Layout financiero.
 - `context/ApiContext.tsx` — Métodos: `get`, `post`, `put`, `patch`, `del`, `postXml`, `upload`
 - `context/AuthContext.tsx` — Provider con `user`, `token`, `login()`, `logout()`, `hasPermiso()`. Hook `usePermiso(codigo)` y `useAuth()`. Detecta `isFirstRun` automáticamente.
@@ -453,3 +453,7 @@ La migración `16_helpdesk_schema.sql` incluye:
 52. **Terceros movido a schema generales** — `facturacion.terceros` migrado a `generales.terceros` para consistencia cross-module. Schema `01_schema.sql` actualizado, 10 controladores backend corregidos (~37 sentencias SQL), script `db/migrar_terceros_a_generales.sql` para BD existentes.
 53. **Formulario de gasto movido a página separada** — el formulario "Nuevo Gasto" se eliminó de `Gastos.tsx` y se movió a `NuevoGasto.tsx` en `/financiero/nuevo-gasto` (bajo Layout financiero). La tabla de gastos ahora ocupa todo el alto sin scroll vertical. Botón "+ Nuevo Gasto" en el header. Sección Producto cambió de `<select>` a input búsqueda + lista filtrada que se repliega a badge al seleccionar. Formulario reorganizado en 4 secciones visuales con `border-b`.
 54. **Header financiero cambió "← Inicio" por "← Atrás"** — `components/Layout.tsx` ahora usa `navigate(-1)` en lugar de `navigate("/")` para mejor navegación contextual.
+55. **Secuencia terceros eliminada por CASCADE** — la migración `migrar_terceros_a_generales.sql` usaba `LIKE ... INCLUDING DEFAULTS` que copiaba el default apuntando a `facturacion.terceros_id_seq`, luego `DROP TABLE ... CASCADE` eliminaba esa secuencia. Solución: después del DROP, crear secuencia `generales.terceros_id_seq` y hacer `ALTER TABLE ... SET DEFAULT`. Fix agregado a la migración y script `db/fix_produccion.sql` para producción.
+56. **NIT null en NuevaVenta** — `!nit.trim()` fallaba cuando `nit` es null (terceros sin identificación). Cambiado a `!(nit ?? "").trim()` en `NuevaVenta.tsx:604`.
+57. **Dropdown de productos cortado por overflow** — el dropdown de productos en NuevaVenta se renderizaba dentro de la tabla con `overflow-x-auto`, que el navegador convierte a `overflow: auto` para ambos ejes, cortando el dropdown. Solución: renderizar el dropdown via `createPortal` a `document.body` con `position: fixed`.
+58. **Utilidad: página rediseñada** — se eliminó el tab "Por Producto", ahora solo muestra "Por Factura" con listado completo de facturas, búsqueda por N° o cliente, ordenación por columnas clickeando encabezados. Nuevo endpoint `GET /api/facturacion/utilidad/facturas?q=`.
