@@ -14,7 +14,7 @@ interface CarteraItem {
   saldo_pendiente: string;
   cliente_id: number;
   cliente: string;
-  nit_cliente: string;
+  nit_cliente: string | null;
   estado: string;
   estado_cartera: string;
   dias_vencida: number;
@@ -81,7 +81,7 @@ export default function Cartera() {
   const itemsFiltrados = useMemo(() => {
     if (!filtroClienteTexto) return items;
     const t = filtroClienteTexto.toLowerCase();
-    return items.filter((i) => i.cliente.toLowerCase().includes(t) || i.nit_cliente.includes(t));
+    return items.filter((i) => i.cliente.toLowerCase().includes(t) || (i.nit_cliente ?? "").includes(t));
   }, [items, filtroClienteTexto]);
 
   const totales = useMemo(() => {
@@ -292,7 +292,7 @@ export default function Cartera() {
                     <td className="p-3 font-medium">{it.numero_completo}</td>
                     <td className="p-3">
                       <div className="font-medium">{it.cliente}</div>
-                      <div className="text-xs text-gray-500">{it.nit_cliente}</div>
+                      <div className="text-xs text-gray-500">{it.nit_cliente ?? ""}</div>
                     </td>
                     <td className="p-3 text-gray-600">{formatDate(it.fecha_emision)}</td>
                     <td className="p-3 text-gray-600">{it.fecha_vencimiento_pago ? formatDate(it.fecha_vencimiento_pago) : "-"}</td>

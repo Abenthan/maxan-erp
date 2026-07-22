@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useApi } from "../context/ApiContext";
 import { usePermiso } from "../context/AuthContext";
 
@@ -11,7 +11,7 @@ interface Pago {
   medio_pago: string;
   cliente_id: number;
   cliente: string;
-  nit_cliente: string;
+  nit_cliente: string | null;
   facturas_aplicadas: number;
 }
 
@@ -60,6 +60,14 @@ export default function Pagos() {
   const [filtroFechaHasta, setFiltroFechaHasta] = useState("");
   const [filtroAnulado, setFiltroAnulado] = useState("");
 
+  const pagosFiltrados = useMemo(() => {
+    if (!filtroCliente) return pagos;
+    const t = filtroCliente.toLowerCase();
+    return pagos.filter((p) =>
+      p.cliente.toLowerCase().includes(t) || (p.nit_cliente ?? "").toLowerCase().includes(t)
+    );
+  }, [pagos, filtroCliente]);
+
   const [detalle, setDetalle] = useState<PagoDetalle | null>(null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -73,7 +81,6 @@ export default function Pagos() {
     setLoading(true);
     setError("");
     const params = new URLSearchParams();
-    if (filtroCliente) params.set("cliente_id", filtroCliente);
     if (filtroFechaDesde) params.set("fecha_desde", filtroFechaDesde);
     if (filtroFechaHasta) params.set("fecha_hasta", filtroFechaHasta);
     if (filtroAnulado) params.set("anulado", filtroAnulado);
@@ -86,7 +93,7 @@ export default function Pagos() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { cargar(); }, [api, filtroCliente, filtroFechaDesde, filtroFechaHasta, filtroAnulado]);
+  useEffect(() => { cargar(); }, [api, filtroFechaDesde, filtroFechaHasta, filtroAnulado]);
 
   const abrirModal = async (id: number) => {
     setLoadingDetalle(true);
@@ -214,10 +221,10 @@ export default function Pagos() {
             <tbody>
               {loading && pagos.length === 0 ? (
                 <tr><td colSpan={7} className="p-8 text-center text-gray-400">Cargando...</td></tr>
-              ) : pagos.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-gray-400">No hay pagos registrados</td></tr>
+              ) : pagosFiltrados.length === 0 ? (
+                <tr><td colSpan={7} className="p-8 text-center text-gray-400">{pagos.length === 0 ? "No hay pagos registrados" : "No se encontraron pagos con esos filtros"}</td></tr>
               ) : (
-                pagos.map((p) => (
+                pagosFiltrados.map((p) => (
                   <tr
                     key={p.id}
                     onClick={() => !p.anulado && puedeGestionar && abrirModal(p.id)}
@@ -226,7 +233,7 @@ export default function Pagos() {
                     <td className="p-3">{formatDate(p.fecha_pago)}</td>
                     <td className="p-3">
                       <div className="font-medium">{p.cliente}</div>
-                      <div className="text-xs text-gray-500">{p.nit_cliente}</div>
+                      <div className="text-xs text-gray-500">{p.nit_cliente ?? ""}</div>
                     </td>
                     <td className="p-3 text-gray-600">{p.medio_pago || "-"}</td>
                     <td className="p-3 text-gray-500 text-xs">{p.referencia || "-"}</td>
