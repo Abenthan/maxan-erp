@@ -63,7 +63,7 @@ export default function RecursosGlobal() {
     ? clientes.filter(
         (c) =>
           c.razon_social.toLowerCase().includes(busquedaCliente.toLowerCase()) ||
-          c.numero_documento.includes(busquedaCliente),
+          (c.numero_documento ?? "").includes(busquedaCliente),
       )
     : clientes;
 

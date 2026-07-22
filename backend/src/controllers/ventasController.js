@@ -89,8 +89,8 @@ async function create(req, res) {
       observaciones,
     } = req.body;
 
-    if (!receptor || !receptor.razon_social || !receptor.numero_documento) {
-      return res.status(400).json({ error: "Se requiere receptor con razon_social y numero_documento" });
+    if (!receptor || !receptor.razon_social) {
+      return res.status(400).json({ error: "Se requiere receptor con razon_social" });
     }
     if (!fecha_emision) {
       return res.status(400).json({ error: "La fecha de emisión es obligatoria" });
@@ -101,31 +101,37 @@ async function create(req, res) {
 
     await client.query("BEGIN");
 
-    const upsertQ = `
-      INSERT INTO generales.terceros
-        (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,true)
-      ON CONFLICT (tipo_documento, numero_documento)
-      DO UPDATE SET
-        razon_social = EXCLUDED.razon_social,
-        direccion = EXCLUDED.direccion,
-        ciudad = EXCLUDED.ciudad,
-        departamento = EXCLUDED.departamento,
-        es_cliente = true,
-        updated_at = now()
-      RETURNING id`;
+    const tipoDocVal = receptor.tipo_documento || null;
+    const numDocVal = receptor.numero_documento || null;
 
-    const receptorVals = [
-      receptor.tipo_documento || "13",
-      receptor.numero_documento,
-      receptor.razon_social,
-      receptor.direccion || null,
-      receptor.ciudad || null,
-      receptor.departamento || null,
-      "CO",
-    ];
-    const receptorResult = await client.query(upsertQ, receptorVals);
-    const receptorId = receptorResult.rows[0].id;
+    let receptorId;
+    if (tipoDocVal && numDocVal) {
+      const result = await client.query(`
+        INSERT INTO generales.terceros
+          (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,true)
+        ON CONFLICT (tipo_documento, numero_documento)
+        DO UPDATE SET
+          razon_social = EXCLUDED.razon_social,
+          direccion = EXCLUDED.direccion,
+          ciudad = EXCLUDED.ciudad,
+          departamento = EXCLUDED.departamento,
+          es_cliente = true,
+          updated_at = now()
+        RETURNING id`,
+        [tipoDocVal, numDocVal, receptor.razon_social, receptor.direccion || null, receptor.ciudad || null, receptor.departamento || null, "CO"]
+      );
+      receptorId = result.rows[0].id;
+    } else {
+      const result = await client.query(`
+        INSERT INTO generales.terceros
+          (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,true)
+        RETURNING id`,
+        [null, null, receptor.razon_social, receptor.direccion || null, receptor.ciudad || null, receptor.departamento || null, "CO"]
+      );
+      receptorId = result.rows[0].id;
+    }
 
     const emisorResult = await client.query(
       `SELECT id FROM generales.terceros WHERE es_propio = true LIMIT 1`
@@ -261,8 +267,8 @@ async function update(req, res) {
 
     const { receptor, fecha_emision, moneda, items, observaciones } = req.body;
 
-    if (!receptor || !receptor.razon_social || !receptor.numero_documento) {
-      return res.status(400).json({ error: "Se requiere receptor con razon_social y numero_documento" });
+    if (!receptor || !receptor.razon_social) {
+      return res.status(400).json({ error: "Se requiere receptor con razon_social" });
     }
     if (!fecha_emision) {
       return res.status(400).json({ error: "La fecha de emisión es obligatoria" });
@@ -273,31 +279,37 @@ async function update(req, res) {
 
     await client.query("BEGIN");
 
-    const upsertQ = `
-      INSERT INTO generales.terceros
-        (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,true)
-      ON CONFLICT (tipo_documento, numero_documento)
-      DO UPDATE SET
-        razon_social = EXCLUDED.razon_social,
-        direccion = EXCLUDED.direccion,
-        ciudad = EXCLUDED.ciudad,
-        departamento = EXCLUDED.departamento,
-        es_cliente = true,
-        updated_at = now()
-      RETURNING id`;
+    const tipoDocVal = receptor.tipo_documento || null;
+    const numDocVal = receptor.numero_documento || null;
 
-    const receptorVals = [
-      receptor.tipo_documento || "13",
-      receptor.numero_documento,
-      receptor.razon_social,
-      receptor.direccion || null,
-      receptor.ciudad || null,
-      receptor.departamento || null,
-      "CO",
-    ];
-    const receptorResult = await client.query(upsertQ, receptorVals);
-    const receptorId = receptorResult.rows[0].id;
+    let receptorId;
+    if (tipoDocVal && numDocVal) {
+      const result = await client.query(`
+        INSERT INTO generales.terceros
+          (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,true)
+        ON CONFLICT (tipo_documento, numero_documento)
+        DO UPDATE SET
+          razon_social = EXCLUDED.razon_social,
+          direccion = EXCLUDED.direccion,
+          ciudad = EXCLUDED.ciudad,
+          departamento = EXCLUDED.departamento,
+          es_cliente = true,
+          updated_at = now()
+        RETURNING id`,
+        [tipoDocVal, numDocVal, receptor.razon_social, receptor.direccion || null, receptor.ciudad || null, receptor.departamento || null, "CO"]
+      );
+      receptorId = result.rows[0].id;
+    } else {
+      const result = await client.query(`
+        INSERT INTO generales.terceros
+          (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,true)
+        RETURNING id`,
+        [null, null, receptor.razon_social, receptor.direccion || null, receptor.ciudad || null, receptor.departamento || null, "CO"]
+      );
+      receptorId = result.rows[0].id;
+    }
 
     const subtotal = items.reduce((s, it) => s + (it.valor_linea || 0), 0);
     const total = items.reduce((s, it) => s + (it.valor_total || it.valor_linea || 0), 0);

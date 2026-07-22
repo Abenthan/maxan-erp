@@ -25,8 +25,8 @@ interface ItemLinea {
 
 interface ClienteResult {
   id: number;
-  tipo_documento: string;
-  numero_documento: string;
+  tipo_documento: string | null;
+  numero_documento: string | null;
   razon_social: string;
   direccion: string;
   ciudad: string;
@@ -76,8 +76,8 @@ export default function NuevaVenta() {
         .then(([data, prods]) => {
           setProductos(prods);
           setCliente(data.razon_social);
-          setNit(data.numero_documento);
-          setTipoDoc(data.tipo_documento || "13");
+          setNit(data.numero_documento ?? "");
+          setTipoDoc(data.tipo_documento ?? "");
           setDir(data.direccion || "");
           setCiudad(data.ciudad || "");
           setFecha(data.fecha_emision ? data.fecha_emision.slice(0, 10) : "");
@@ -140,8 +140,8 @@ export default function NuevaVenta() {
 
   function seleccionarCliente(c: ClienteResult) {
     setCliente(c.razon_social);
-    setNit(c.numero_documento);
-    setTipoDoc(c.tipo_documento);
+    setNit(c.numero_documento ?? "");
+    setTipoDoc(c.tipo_documento ?? "");
     setDir(c.direccion || "");
     setCiudad(c.ciudad || "");
     setMostrarSugerencias(false);
@@ -276,7 +276,8 @@ export default function NuevaVenta() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!cliente.trim() || !nit.trim()) return;
+    if (!cliente.trim()) return;
+    if (tipoDoc && !nit.trim()) return;
     if (!lineas.some((l) => l.producto_id && l.valor_unitario)) return;
 
     setGuardando(true);
@@ -371,21 +372,22 @@ export default function NuevaVenta() {
                 <label className="block text-xs font-medium text-gray-500 mb-1">Tipo doc.</label>
                 <select
                   value={tipoDoc}
-                  onChange={(e) => setTipoDoc(e.target.value)}
+                  onChange={(e) => { setTipoDoc(e.target.value); if (e.target.value === "") setNit(""); }}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
                 >
+                  <option value="">Sin documento</option>
                   <option value="13">Cédula (CC)</option>
                   <option value="31">NIT</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">NIT / CC *</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">NIT / CC {tipoDoc ? "*" : ""}</label>
                 <input
                   type="text"
                   value={nit}
                   onChange={(e) => setNit(e.target.value)}
-                  required
-                  placeholder="123456789"
+                  required={!!tipoDoc}
+                  placeholder={tipoDoc ? "123456789" : ""}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -616,7 +618,7 @@ export default function NuevaVenta() {
             </button>
             <button
               type="submit"
-              disabled={guardando || !cliente.trim() || !(nit ?? "").trim() || total <= 0}
+              disabled={guardando || !cliente.trim() || (tipoDoc && !(nit ?? "").trim()) || total <= 0}
               className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
             >
               {guardando ? (editandoId ? "Actualizando..." : "Guardando...") : (editandoId ? "Actualizar Venta" : "Guardar Venta")}

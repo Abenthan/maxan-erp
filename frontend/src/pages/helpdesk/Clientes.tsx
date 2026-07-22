@@ -32,7 +32,7 @@ export default function HelpdeskClientes() {
     const q = busqueda.toLowerCase();
     return (
       c.razon_social.toLowerCase().includes(q) ||
-      c.numero_documento.includes(q)
+      (c.numero_documento ?? "").includes(q)
     );
   });
 
