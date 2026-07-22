@@ -9,7 +9,7 @@ interface FacturaResumen {
   numero_completo: string;
   fecha_emision: string;
   receptor: string;
-  nit_receptor: string;
+  nit_receptor: string | null;
   valor_a_pagar: string;
   estado: string;
   cufe: string;
@@ -68,7 +68,7 @@ export default function Facturas() {
       const matchSearch = !search
         || f.numero_completo.toLowerCase().includes(q)
         || f.receptor.toLowerCase().includes(q)
-        || f.nit_receptor.includes(q);
+        || (f.nit_receptor ?? "").includes(q);
       const matchFecha = (!fechaDesde || f.fecha_emision >= fechaDesde)
         && (!fechaHasta || f.fecha_emision <= fechaHasta + "T23:59:59");
       return matchSearch && matchFecha;

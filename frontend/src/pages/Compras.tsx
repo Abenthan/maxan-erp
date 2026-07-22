@@ -8,7 +8,7 @@ interface FacturaCompra {
   numero_completo: string;
   fecha_emision: string;
   proveedor: string;
-  nit_proveedor: string;
+  nit_proveedor: string | null;
   valor_a_pagar: string;
   estado: string;
 }
@@ -61,7 +61,7 @@ export default function Compras() {
       const matchBusq = !busqueda
         || c.numero_completo.toLowerCase().includes(busqueda.toLowerCase())
         || c.proveedor.toLowerCase().includes(busqueda.toLowerCase())
-        || c.nit_proveedor.includes(busqueda);
+        || (c.nit_proveedor ?? "").includes(busqueda);
       const matchDesde = !fechaDesde || c.fecha_emision >= fechaDesde;
       const matchHasta = !fechaHasta || c.fecha_emision <= fechaHasta;
       return matchBusq && matchDesde && matchHasta;
