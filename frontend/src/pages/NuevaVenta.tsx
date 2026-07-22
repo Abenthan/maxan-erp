@@ -77,7 +77,7 @@ export default function NuevaVenta() {
           setProductos(prods);
           setCliente(data.razon_social);
           setNit(data.numero_documento ?? "");
-          setTipoDoc(data.tipo_documento ?? "");
+          setTipoDoc(normalizarTipoDoc(data.tipo_documento, data.numero_documento));
           setDir(data.direccion || "");
           setCiudad(data.ciudad || "");
           setFecha(data.fecha_emision ? data.fecha_emision.slice(0, 10) : "");
@@ -140,10 +140,17 @@ export default function NuevaVenta() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  function normalizarTipoDoc(td: string | null, nd: string | null): string {
+    const valido = td === "13" || td === "31";
+    if (valido) return td;
+    if (nd && nd.trim()) return "31";
+    return "";
+  }
+
   function seleccionarCliente(c: ClienteResult) {
     setCliente(c.razon_social);
     setNit(c.numero_documento ?? "");
-    setTipoDoc(c.tipo_documento ?? "");
+    setTipoDoc(normalizarTipoDoc(c.tipo_documento, c.numero_documento));
     setDir(c.direccion || "");
     setCiudad(c.ciudad || "");
     setMostrarSugerencias(false);
@@ -315,6 +322,7 @@ export default function NuevaVenta() {
         ? await api.put<{ success: boolean; venta_id: number; total: number; items: { id: number; producto_id: number; cantidad: number }[] }>(`/ventas/${editandoId}`, body)
         : await api.post<{ success: boolean; venta_id: number; numero: string; total: number; items: { id: number; producto_id: number; cantidad: number }[] }>("/ventas", body);
 
+      const erroresConsumo: string[] = [];
       if (!editandoId) {
         const itemsInventariables = (result.items || []).filter(
           (it) => lineas.find((l) => l.producto_id === it.producto_id)?.inventariable
@@ -328,13 +336,21 @@ export default function NuevaVenta() {
               producto_id: item.producto_id,
               cantidad: item.cantidad,
             });
-          } catch {
-            // Si falla el consumo, continuamos (puede no haber stock suficiente)
+          } catch (e: unknown) {
+            const msg = (e as any)?.response?.data?.error
+              ?? (e instanceof Error ? e.message : "Error al consumir inventario");
+            erroresConsumo.push(`${linea.nombre}: ${msg}`);
           }
         }
       }
 
-      setExito(editandoId ? "Venta actualizada exitosamente" : "Venta registrada exitosamente");
+      setExito(
+        (editandoId ? "Venta actualizada" : "Venta registrada") +
+        (erroresConsumo.length > 0 ? " (con errores de inventario)" : "")
+      );
+      if (erroresConsumo.length > 0) {
+        setError("Error al consumir inventario:\n" + erroresConsumo.join("\n"));
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error al guardar");
     } finally {

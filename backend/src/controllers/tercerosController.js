@@ -74,7 +74,7 @@ async function create(req, res) {
            departamento, codigo_postal, pais, telefono, email, es_propio,
            es_cliente, es_proveedor)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-         ON CONFLICT (tipo_documento, numero_documento) WHERE tipo_documento IS NOT NULL AND numero_documento IS NOT NULL
+         ON CONFLICT (tipo_documento, numero_documento)
          DO UPDATE SET
            razon_social = EXCLUDED.razon_social,
            direccion = EXCLUDED.direccion,

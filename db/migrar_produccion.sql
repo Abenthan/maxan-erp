@@ -11,8 +11,8 @@ CREATE SCHEMA IF NOT EXISTS facturacion;
 
 CREATE TABLE IF NOT EXISTS generales.terceros (
     id                  SERIAL PRIMARY KEY,
-    tipo_documento      VARCHAR(5)   NOT NULL,
-    numero_documento    VARCHAR(20)  NOT NULL,
+    tipo_documento      VARCHAR(5),
+    numero_documento    VARCHAR(20),
     digito_verificacion VARCHAR(1),
     tipo_persona        VARCHAR(20),
     razon_social        VARCHAR(255) NOT NULL,

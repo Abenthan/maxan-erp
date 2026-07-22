@@ -14,8 +14,8 @@ SET search_path TO facturacion;
 -- ---------------------------------------------------------------------
 CREATE TABLE generales.terceros (
     id                  SERIAL PRIMARY KEY,
-    tipo_documento      VARCHAR(5)   NOT NULL,        -- schemeID DIAN: 13=NIT, 31=NIT jurídico, etc.
-    numero_documento    VARCHAR(20)  NOT NULL,
+    tipo_documento      VARCHAR(5),                   -- schemeID DIAN: 13=NIT, 31=NIT jurídico, etc.
+    numero_documento    VARCHAR(20),
     digito_verificacion VARCHAR(1),
     tipo_persona        VARCHAR(20),                  -- 'Natural' / 'Jurídica'
     razon_social        VARCHAR(255) NOT NULL,
@@ -1219,21 +1219,21 @@ CREATE TABLE helpdesk.mantenimiento_detalles (
 -- SEED: TERCEROS (clientes desde Notion)
 -- ================================================================
 INSERT INTO generales.terceros (tipo_documento, numero_documento, razon_social) VALUES
-  ('NI', '900000001', 'Gestión Calidad'),
-  ('NI', '900000002', 'Transglobal de Carga'),
-  ('NI', '900000003', 'Montacargas y Transportes'),
-  ('NI', '900000004', 'Promatel'),
-  ('NI', '900000005', 'Grupo Carpini'),
-  ('NI', '900000006', 'Símbolo'),
-  ('NI', '900000007', 'Bekko'),
-  ('NI', '900000008', 'M2 Contable'),
-  ('NI', '900000009', 'Ankaras'),
-  ('NI', '900000010', 'Agregados Antioquia'),
-  ('NI', '900000011', 'Tysi'),
-  ('NI', '900000012', 'Serfletar'),
-  ('NI', '900000013', 'Express Labels'),
-  ('NI', '900000014', 'AMUC')
-ON CONFLICT (tipo_documento, numero_documento) DO NOTHING;
+  ('31', '900000001', 'Gestión Calidad'),
+  ('31', '900000002', 'Transglobal de Carga'),
+  ('31', '900000003', 'Montacargas y Transportes'),
+  ('31', '900000004', 'Promatel'),
+  ('31', '900000005', 'Grupo Carpini'),
+  ('31', '900000006', 'Símbolo'),
+  ('31', '900000007', 'Bekko'),
+  ('31', '900000008', 'M2 Contable'),
+  ('31', '900000009', 'Ankaras'),
+  ('31', '900000010', 'Agregados Antioquia'),
+  ('31', '900000011', 'Tysi'),
+  ('31', '900000012', 'Serfletar'),
+  ('31', '900000013', 'Express Labels'),
+  ('31', '900000014', 'AMUC')
+ON CONFLICT (tipo_documento, numero_documento) WHERE tipo_documento IS NOT NULL AND numero_documento IS NOT NULL DO NOTHING;
 
 -- ================================================================
 -- SEED: RECURSOS desde Notion
