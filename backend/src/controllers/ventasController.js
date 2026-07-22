@@ -368,4 +368,60 @@ async function update(req, res) {
   }
 }
 
-module.exports = { listItems, create, updateItem, getById, update };
+async function remove(req, res) {
+  const pool = getPool(req);
+  const client = await pool.connect();
+  const { id } = req.params;
+
+  try {
+    const check = await client.query(
+      `SELECT id, cufe FROM facturacion.ventas WHERE id = $1`,
+      [id]
+    );
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: "Venta no encontrada" });
+    }
+    if (check.rows[0].cufe) {
+      return res.status(400).json({ error: "No se puede eliminar una venta con factura electrónica" });
+    }
+
+    await client.query("BEGIN");
+
+    await client.query(
+      `UPDATE gastos.gastos SET venta_item_id = NULL WHERE venta_item_id IN (SELECT id FROM facturacion.ventas_items WHERE venta_id = $1)`,
+      [id]
+    );
+    await client.query(
+      `UPDATE helpdesk.mantenimientos SET venta_item_id = NULL WHERE venta_item_id IN (SELECT id FROM facturacion.ventas_items WHERE venta_id = $1)`,
+      [id]
+    );
+    await client.query(
+      `UPDATE helpdesk.casos SET venta_item_id = NULL WHERE venta_item_id IN (SELECT id FROM facturacion.ventas_items WHERE venta_id = $1)`,
+      [id]
+    );
+    await client.query(
+      `DELETE FROM cartera.pago_aplicaciones WHERE venta_id = $1`,
+      [id]
+    );
+    await client.query(
+      `DELETE FROM facturacion.ventas_items WHERE venta_id = $1`,
+      [id]
+    );
+    await client.query(
+      `DELETE FROM facturacion.ventas WHERE id = $1`,
+      [id]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({ success: true, message: "Venta eliminada correctamente" });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error al eliminar venta:", error.message);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { listItems, create, updateItem, getById, update, remove };

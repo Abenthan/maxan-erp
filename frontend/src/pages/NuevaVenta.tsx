@@ -115,6 +115,8 @@ export default function NuevaVenta() {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
 
   useEffect(() => {
     if (cliente.length < 2) { setSugerencias([]); setMostrarSugerencias(false); return; }
@@ -608,21 +610,34 @@ export default function NuevaVenta() {
             </div>
           </div>
 
-          <div className="flex gap-3 justify-end">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={guardando || !cliente.trim() || (tipoDoc && !(nit ?? "").trim()) || total <= 0}
-              className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
-            >
-              {guardando ? (editandoId ? "Actualizando..." : "Guardando...") : (editandoId ? "Actualizar Venta" : "Guardar Venta")}
-            </button>
+          <div className="flex gap-3 justify-between items-center">
+            <div>
+              {editandoId && (
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(true)}
+                  className="px-4 py-2 text-sm rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                >
+                  Eliminar venta
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={guardando || !cliente.trim() || (tipoDoc && !(nit ?? "").trim()) || total <= 0}
+                className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+              >
+                {guardando ? (editandoId ? "Actualizando..." : "Guardando...") : (editandoId ? "Actualizar Venta" : "Guardar Venta")}
+              </button>
+            </div>
           </div>
         </form>
       )}
@@ -636,6 +651,45 @@ export default function NuevaVenta() {
             setActiveSearchIdx(null);
           }}
         />
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { if (!eliminando) setDeleteConfirm(false); }}>
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Eliminar venta</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              ¿Estás seguro de eliminar esta venta y todos sus items?<br />
+              Esta acción no se puede deshacer.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                disabled={eliminando}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  if (!editandoId) return;
+                  setEliminando(true);
+                  try {
+                    await api.del(`/ventas/${editandoId}`);
+                    navigate("/financiero/facturas");
+                  } catch (e: unknown) {
+                    setError(e instanceof Error ? e.message : "Error al eliminar");
+                    setDeleteConfirm(false);
+                    setEliminando(false);
+                  }
+                }}
+                disabled={eliminando}
+                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {eliminando ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
