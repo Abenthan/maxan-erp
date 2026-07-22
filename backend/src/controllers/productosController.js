@@ -101,4 +101,26 @@ async function update(req, res) {
   }
 }
 
-module.exports = { create, list, getById, update };
+async function remove(req, res) {
+  const pool = getPool(req);
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      `DELETE FROM inventario.productos WHERE id = $1 RETURNING id`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Producto no encontrado" });
+    }
+    res.json({ success: true, message: "Producto eliminado correctamente" });
+  } catch (error) {
+    if (error.code === '23503') {
+      return res.status(409).json({ error: "No se puede eliminar el producto porque tiene registros asociados (gastos, ventas, inventario, etc.)" });
+    }
+    console.error("Error al eliminar producto:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+module.exports = { create, list, getById, update, remove };
