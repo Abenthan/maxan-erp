@@ -20,6 +20,7 @@ ON CONFLICT (nombre) DO NOTHING;
 
 -- Migrar constraint CHECK a FK
 ALTER TABLE helpdesk.recursos DROP CONSTRAINT IF EXISTS helpdesk_recursos_tipo_check;
+ALTER TABLE helpdesk.recursos DROP CONSTRAINT IF EXISTS recursos_tipo_check;
 ALTER TABLE helpdesk.recursos DROP CONSTRAINT IF EXISTS fk_recurso_tipo;
 
 ALTER TABLE helpdesk.recursos

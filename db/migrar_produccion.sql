@@ -741,6 +741,7 @@ INSERT INTO helpdesk.tipos_recurso (nombre) VALUES
 ON CONFLICT (nombre) DO NOTHING;
 
 ALTER TABLE helpdesk.recursos DROP CONSTRAINT IF EXISTS helpdesk_recursos_tipo_check;
+ALTER TABLE helpdesk.recursos DROP CONSTRAINT IF EXISTS recursos_tipo_check;
 ALTER TABLE helpdesk.recursos DROP CONSTRAINT IF EXISTS fk_recurso_tipo;
 ALTER TABLE helpdesk.recursos ADD CONSTRAINT fk_recurso_tipo
     FOREIGN KEY (tipo) REFERENCES helpdesk.tipos_recurso(nombre) ON DELETE RESTRICT;
