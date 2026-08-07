@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd ~/maxansistemas
+cd ~/maxan-erp
 
 echo "== Pulling latest code =="
 git pull origin main
