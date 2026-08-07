@@ -1,4 +1,5 @@
 import axios from "axios";
+import { AUTH_DELEGATED, redirectToAuthLogin } from "./authSso";
 
 const api = axios.create({
   baseURL: "/api",
@@ -20,7 +21,11 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
       if (window.location.pathname !== "/login" && window.location.pathname !== "/register") {
-        window.location.href = "/login";
+        if (AUTH_DELEGATED) {
+          redirectToAuthLogin(window.location.origin + window.location.pathname + window.location.search);
+        } else {
+          window.location.href = "/login";
+        }
       }
     }
     if (error.response) {

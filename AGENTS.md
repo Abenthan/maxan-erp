@@ -143,6 +143,19 @@
 - Expiración: 8 horas
 - Envío: `Authorization: Bearer <token>` en cada request vía interceptor de axios
 
+### SSO delegado (maxan-auth) — Fase 4
+Integración preparada pero **INACTIVA por defecto**. El ERP sigue con login propio mientras `VITE_AUTH_DELEGATED` no sea `true`.
+
+- **Código** (frontend, `frontend/src/`):
+  - `lib/authSso.ts` — helper SSO: constantes `AUTH_DELEGATED`/`AUTH_URL`, `authLoginUrl()`, `redirectToAuthLogin()`, `fetchAuthSession()`, `authLogout()`. Lee `import.meta.env.VITE_AUTH_DELEGATED` (`=== "true"`) y `VITE_AUTH_URL` (default `https://auth.maxansistemas.com`).
+  - `context/AuthContext.tsx` — con flag activo, el mount restaura sesión vía `auth.../api/auth/session` (cookie = fuente de verdad) en vez de `/auth/me`; `logout()` además revoca cookie en auth.
+  - `pages/Login.tsx` — con flag activo redirige a `auth.maxansistemas.com/login?app=erp&redirect=...`.
+  - `lib/api.ts` — con flag activo, un 401 redirige a auth (guardando la URL actual) en vez de `/login`.
+  - `vite-env.d.ts` + `.env.example` — tipado de las variables y plantilla.
+- **Backend ERP sin cambios**: el middleware `authenticate` valida el JWT emitido por auth (mismo `JWT_SECRET` de producción). El payload es idéntico.
+- **Cómo habilitar** (cuando maxan-auth esté validado): en el frontend, `VITE_AUTH_DELEGATED=true` y `VITE_AUTH_URL=https://auth.maxansistemas.com` (o `http://localhost:5175` para probar local). Rebuild + redeploy del frontend.
+- **Dev local**: auth dev usa cookie host-only en `localhost` (CORS incluye `http://localhost:5173` para el ERP dev).
+
 ## Schemas SQL
 - `db/init/01_schema.sql` — Schema consolidado (facturacion, compras, inventario, gastos, cartera, usuarios, generales, helpdesk). Se ejecuta automáticamente al crear el contenedor PostgreSQL por primera vez via `docker-entrypoint-initdb.d`.
 - `db/migrar_produccion.sql` — Script para ejecutar en DBeaver contra una BD de producción que se creó antes de tener el schema consolidado. Crea schemas cartera, usuarios, helpdesk y tablas faltantes.

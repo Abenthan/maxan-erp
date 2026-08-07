@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { AUTH_DELEGATED, redirectToAuthLogin } from "../lib/authSso";
 
 export default function Login() {
   const { login, isFirstRun } = useAuth();
@@ -9,6 +10,20 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (AUTH_DELEGATED) {
+      redirectToAuthLogin();
+    }
+  }, []);
+
+  if (AUTH_DELEGATED) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-500">
+        Redirigiendo a autenticación central...
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

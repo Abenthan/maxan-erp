@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import api from "../lib/api";
+import { AUTH_DELEGATED, fetchAuthSession, authLogout } from "../lib/authSso";
 
 interface User {
   id: number;
@@ -43,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isFirstRun, setIsFirstRun] = useState<boolean | null>(null);
 
   useEffect(() => {
+    if (AUTH_DELEGATED) return;
     if (token) {
       api.get<User>("/auth/me")
         .then((res) => {
@@ -59,6 +61,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   }, [token]);
+
+  useEffect(() => {
+    if (!AUTH_DELEGATED) return;
+    let cancelled = false;
+    fetchAuthSession()
+      .then((res) => {
+        if (cancelled) return;
+        localStorage.setItem("token", res.token);
+        setToken(res.token);
+        setUser(res.user);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        localStorage.removeItem("token");
+        setToken(null);
+        setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     api.get<{ firstRun: boolean }>("/auth/check-first-run")
@@ -82,6 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
+    if (AUTH_DELEGATED) {
+      authLogout();
+    }
   }, []);
 
   const hasPermiso = useCallback((codigo: string): boolean => {

@@ -219,6 +219,15 @@ maxan-erp/
 └── docker-compose.dev.yml
 ```
 
+## SSO delegado (maxan-auth)
+
+El login puede delegarse a **auth.maxansistemas.com** (SSO). Está **preparado pero inactivo por defecto**:
+
+- Controlado por `VITE_AUTH_DELEGATED` (frontend). Con `false` o sin el archivo, el ERP funciona como hoy.
+- Con `true`, `Login.tsx` redirige a auth, la sesión se restaura vía `auth.../api/auth/session`, el logout revoca la cookie, y un 401 redirige a auth.
+- Para habilitar: `VITE_AUTH_DELEGATED=true` + `VITE_AUTH_URL=https://auth.maxansistemas.com` (prod) o `http://localhost:5175` (dev) y rebuild del frontend.
+- Detalles: `frontend/src/lib/authSso.ts` y sección "SSO delegado (maxan-auth)" en `AGENTS.md`.
+
 ## Notas importantes
 
 - El NIT/CC en los XML colombianos puede estar en `PartyLegalEntity.CompanyID` en lugar de `PartyIdentification.ID`. El parser revisa ambas ubicaciones.
