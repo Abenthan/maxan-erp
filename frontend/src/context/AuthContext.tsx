@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import api from "../lib/api";
 import { AUTH_DELEGATED, fetchAuthSession, authLogout } from "../lib/authSso";
 
@@ -42,28 +42,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
   const [isFirstRun, setIsFirstRun] = useState<boolean | null>(null);
+  const urlTokenApplied = useRef(false);
 
-  useEffect(() => {
-    if (AUTH_DELEGATED) return;
-    if (token) {
-      api.get<User>("/auth/me")
-        .then((res) => {
-          setUser(res.data);
-          localStorage.setItem("token", token);
-        })
-        .catch(() => {
-          localStorage.removeItem("token");
-          setToken(null);
-          setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, [token]);
-
+  // Effect 1: Extract ?token= from URL after SSO redirect (delegated mode only)
   useEffect(() => {
     if (!AUTH_DELEGATED) return;
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get("token");
+    if (urlToken) {
+      localStorage.setItem("token", urlToken);
+      setToken(urlToken);
+      urlTokenApplied.current = true;
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }, []);
+
+  // Effect 2: SSO session restore via cookie (delegated mode, no URL token)
+  useEffect(() => {
+    if (!AUTH_DELEGATED) return;
+    if (urlTokenApplied.current) return;
     let cancelled = false;
     fetchAuthSession()
       .then((res) => {
@@ -81,10 +79,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  // Effect 3: Validate token and load user via /auth/me (both modes)
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    api.get<User>("/auth/me")
+      .then((res) => {
+        if (cancelled) return;
+        setUser(res.data);
+        localStorage.setItem("token", token);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        localStorage.removeItem("token");
+        setToken(null);
+        setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [token]);
 
   useEffect(() => {
     api.get<{ firstRun: boolean }>("/auth/check-first-run")

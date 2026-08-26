@@ -144,17 +144,26 @@
 - Envío: `Authorization: Bearer <token>` en cada request vía interceptor de axios
 
 ### SSO delegado (maxan-auth) — Fase 4
-Integración preparada pero **INACTIVA por defecto**. El ERP sigue con login propio mientras `VITE_AUTH_DELEGATED` no sea `true`.
+Integración **FUNCIONAL en dev**. `VITE_AUTH_DELEGATED=true` en `.env.local`.
 
 - **Código** (frontend, `frontend/src/`):
   - `lib/authSso.ts` — helper SSO: constantes `AUTH_DELEGATED`/`AUTH_URL`, `authLoginUrl()`, `redirectToAuthLogin()`, `fetchAuthSession()`, `authLogout()`. Lee `import.meta.env.VITE_AUTH_DELEGATED` (`=== "true"`) y `VITE_AUTH_URL` (default `https://auth.maxansistemas.com`).
-  - `context/AuthContext.tsx` — con flag activo, el mount restaura sesión vía `auth.../api/auth/session` (cookie = fuente de verdad) en vez de `/auth/me`; `logout()` además revoca cookie en auth.
+  - `context/AuthContext.tsx` — con flag activo:
+    - **Effect 1** (mount): extrae `?token=<jwt>` de la URL (tras redirect desde auth) → guarda en localStorage → limpia URL con `replaceState`.
+    - **Effect 2** (mount): si NO hay token URL, restaura sesión vía `fetchAuthSession()` (cookie cross-origin).
+    - **Effect 3** (token change): valida token con `GET /api/auth/me` (Bearer) → setea user y loading. Funciona en ambos modos (delegado y propio).
+    - `logout()` revoca cookie en auth.
   - `pages/Login.tsx` — con flag activo redirige a `auth.maxansistemas.com/login?app=erp&redirect=...`.
   - `lib/api.ts` — con flag activo, un 401 redirige a auth (guardando la URL actual) en vez de `/login`.
   - `vite-env.d.ts` + `.env.example` — tipado de las variables y plantilla.
 - **Backend ERP sin cambios**: el middleware `authenticate` valida el JWT emitido por auth (mismo `JWT_SECRET` de producción). El payload es idéntico.
-- **Cómo habilitar** (cuando maxan-auth esté validado): en el frontend, `VITE_AUTH_DELEGATED=true` y `VITE_AUTH_URL=https://auth.maxansistemas.com` (o `http://localhost:5175` para probar local). Rebuild + redeploy del frontend.
-- **Dev local**: auth dev usa cookie host-only en `localhost` (CORS incluye `http://localhost:5173` para el ERP dev).
+- **Cómo habilitar**: en el frontend, `VITE_AUTH_DELEGATED=true` y `VITE_AUTH_URL=https://auth.maxansistemas.com` (o `http://localhost:5175` para probar local). Rebuild + redeploy del frontend.
+- **Dev local**: auth dev usa cookie `sameSite: "lax"` + `secure: false` (HTTP). ERP consume token via `?token=` en URL tras redirect.
+- **Flujo SSO dev completo**:
+  1. ERP sin sesión → redirige a `localhost:5175/login?app=erp&redirect=http://localhost:5173/`
+  2. Auth login → setea cookie + redirige a `localhost:5173/?token=<jwt>`
+  3. ERP extrae token de URL → valida con `/auth/me` → logueado
+  4. Visitas futuras: token en localStorage → Effect 3 valida con `/auth/me`
 
 ## Schemas SQL
 - `db/init/01_schema.sql` — Schema consolidado (facturacion, compras, inventario, gastos, cartera, usuarios, generales, helpdesk). Se ejecuta automáticamente al crear el contenedor PostgreSQL por primera vez via `docker-entrypoint-initdb.d`.
@@ -473,3 +482,4 @@ La migración `16_helpdesk_schema.sql` incluye:
 59. **NuevaVenta: soporte "Sin documento"** — se agregó opción "Sin documento" al select Tipo doc. Al seleccionar cliente, el tipo doc se actualiza automáticamente según sus datos (o queda vacío si no tiene). Al guardar con "Sin documento", el backend envía `tipo_documento=NULL` y `numero_documento=NULL` sin `ON CONFLICT` (el índice parcial único los ignora cuando son NULL). Frontend: `NuevaVenta.tsx`, Backend: `ventasController.js`.
 60. **Eliminar venta sin factura** — se agregó `DELETE /api/ventas/:id` (protegido con `ventas.crear`, solo si `cufe IS NULL`). En transacción: desvincula gastos/helpdesk, elimina salidas, items y venta. Botón "Eliminar venta" en el formulario de edición `NuevaVenta.tsx` (solo en modo edición), redirige a `/financiero/facturas` tras eliminar. Eliminado el botón de `VentasItems.tsx`. Backend: `ventasController.remove()`, ruta en `routes/ventas.js`.
 61. **Eliminar producto** — se agregó `DELETE /api/productos/:id` (protegido con `productos.gestionar`). Botón "Eliminar" en el modal de edición de producto en `Productos.tsx` con confirmación. Si el producto tiene registros asociados (gastos, ventas, inventario), retorna error 409. Backend: `productosController.remove()`, ruta en `routes/productos.js`.
+62. **SSO redirect loop (maxan-auth ↔ maxan-erp)** — al habilitar `VITE_AUTH_DELEGATED=true`, el ERP y auth entraban en un loop infinito de redirecciones. Causa: la cookie `maxan_session` se configuraba con `sameSite: "none"` + `secure: true`, que Chrome rechaza en HTTP (dev). Solución en 3 partes: (1) auth backend `sessions.js` cambia cookie a `sameSite: "lax"` + `secure: false` en dev; (2) auth frontend `Login.tsx` pasa el JWT en la URL (`?token=<jwt>`) al redirigir al ERP; (3) ERP `AuthContext.tsx` extrae el token de la URL al montar (Effect 1), lo guarda en localStorage y lo valida con `/auth/me` (Effect 3). Esto elimina la dependencia de la cookie cross-origin para el flujo de login en dev.

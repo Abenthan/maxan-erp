@@ -1,6 +1,12 @@
 const AUTH_DELEGATED = import.meta.env.VITE_AUTH_DELEGATED === "true";
 const AUTH_URL = import.meta.env.VITE_AUTH_URL || "https://auth.maxansistemas.com";
 
+// En desarrollo el API de sesión se consume por un proxy mismo-origen
+// (vite.config.ts: /auth-sso -> backend de auth) para evitar el bloqueo de
+// cookies cross-origin. La página de login (navegación completa) sí usa AUTH_URL.
+const AUTH_API_BASE =
+  AUTH_DELEGATED && import.meta.env.DEV ? "/auth-sso" : AUTH_URL;
+
 export interface SsoUser {
   id: number;
   empresa_id: number;
@@ -31,13 +37,13 @@ export function redirectToAuthLogin(redirect?: string): void {
 }
 
 export async function fetchAuthSession(): Promise<SsoSession> {
-  const res = await fetch(`${AUTH_URL}/api/auth/session`, { credentials: "include" });
+  const res = await fetch(`${AUTH_API_BASE}/api/auth/session`, { credentials: "include" });
   if (!res.ok) throw new Error("Sesión no válida");
   return res.json();
 }
 
 export function authLogout(): void {
-  void fetch(`${AUTH_URL}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(
+  void fetch(`${AUTH_API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(
     () => undefined
   );
 }

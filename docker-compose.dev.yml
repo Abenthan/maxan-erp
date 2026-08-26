@@ -1,3 +1,14 @@
+# ============================================================
+# maxan-erp — DESARROLLO
+# Levanta postgres + backend (nodemon) + frontend (Vite HMR).
+# La BD se inicializa automáticamente desde db/init/.
+#
+# Uso:
+#   docker compose -f docker-compose.dev.yml up
+#   - Postgres:  localhost:5433
+#   - Backend:   http://localhost:3000/health
+#   - Frontend:  http://localhost:5173
+# ============================================================
 services:
   postgres:
     image: postgres:16
@@ -7,6 +18,12 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c work_mem=4MB
+      -c effective_cache_size=128MB
+      -c maintenance_work_mem=64MB
     ports:
       - "5433:5432"
     volumes:
@@ -17,6 +34,55 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  erp-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: maxan-erp-backend-dev
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    env_file: backend/.env
+    environment:
+      DB_HOST: host.docker.internal
+      DB_PORT: 5433
+      NODE_ENV: development
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  erp-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: maxan-erp-frontend-dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_PROXY: http://erp-backend:3000
+      VITE_AUTH_SSO_PROXY: http://host.docker.internal:3006
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - erp-backend
+    deploy:
+      resources:
+        limits:
+          memory: 384M
 
 volumes:
   maxan_db_data:
