@@ -15,6 +15,7 @@ interface Movimiento {
   fecha: string;
   descripcion: string;
   tipo: string;
+  origen?: string;
 }
 
 interface MovimientosData {
@@ -86,6 +87,7 @@ export default function MovimientosInventario() {
                   <tr className="border-b text-left">
                     <th className="p-2 font-semibold text-gray-600">#</th>
                     <th className="p-2 font-semibold text-gray-600">Descripción</th>
+                    <th className="p-2 font-semibold text-gray-600">Origen</th>
                     <th className="p-2 font-semibold text-gray-600 text-right">Cantidad</th>
                     <th className="p-2 font-semibold text-gray-600 text-right">Disponible</th>
                     <th className="p-2 font-semibold text-gray-600 text-right">Costo Unit.</th>
@@ -97,6 +99,15 @@ export default function MovimientosInventario() {
                     <tr key={e.id} className="border-b hover:bg-gray-50">
                       <td className="p-2 text-gray-500">{e.id}</td>
                       <td className="p-2 font-medium">{e.descripcion}</td>
+                      <td className="p-2">
+                        {e.origen && e.origen !== "gasto" ? (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${e.origen === "inicial" ? "bg-emerald-100 text-emerald-700" : e.origen === "ajuste" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"}`}>
+                            {e.origen === "inicial" ? "Stock inicial" : e.origen === "ajuste" ? "Ajuste" : "Otro"}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Compra</span>
+                        )}
+                      </td>
                       <td className="p-2 text-right">{parseFloat(e.cantidad).toLocaleString("es-CO")}</td>
                       <td className="p-2 text-right">{parseFloat(e.cantidad_disponible || "0").toLocaleString("es-CO")}</td>
                       <td className="p-2 text-right">{formatCurrency(parseFloat(e.costo_unitario))}</td>
@@ -104,7 +115,7 @@ export default function MovimientosInventario() {
                     </tr>
                   ))}
                   {data.entradas.length === 0 && (
-                    <tr><td colSpan={6} className="p-6 text-center text-gray-400">Sin entradas registradas</td></tr>
+                    <tr><td colSpan={7} className="p-6 text-center text-gray-400">Sin entradas registradas</td></tr>
                   )}
                 </tbody>
               </table>

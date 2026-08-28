@@ -51,7 +51,8 @@
 - **Clasificaciones de Gasto** — `routes/clasificacionesGasto.js` → `GET/POST/DELETE /api/gastos/clasificaciones` (maestro como categorías de producto, con FK en `gastos.gastos.clasificacion`)
 - **Compras** — `routes/compras.js` → `POST /api/compras/upload` (multer + reuso de `parseInvoiceXML`), `POST /api/compras/parsear-xml` (solo parseo, sin guardar), `GET /api/compras`
   - Al guardar una compra, por cada línea crea un gasto en `gastos.gastos` y por cada impuesto (>0) crea un gasto adicional distribuido proporcionalmente según `item.valor_linea / subtotal_total`
-- **Inventario** — `routes/inventario.js` → `GET /api/inventario/stock`, `GET /api/inventario/movimientos/:producto_id`, `POST /api/inventario/consumir` (FIFO transaccional)
+- **Inventario** — `routes/inventario.js` → `GET /api/inventario/stock`, `GET /api/inventario/movimientos/:producto_id`, `GET /api/inventario/ingresos`, `POST /api/inventario/entradas` (ingreso manual multi-línea, `inventario.gestionar`), `POST /api/inventario/consumir` (FIFO transaccional)
+  - **Ingresos manuales**: `inventario.entradas.gasto_id` es nullable; una entrada puede ser un ingreso manual (`origen` = `inicial`/`ajuste`/`otro`, `referencia` opcional) sin gasto contable. Complementa el ingreso por compra/gasto Suministros. Migración `25_ingresos_inventario.sql`. El costo de estas entradas cuenta como `costo_adquisiciones` en `vw_utilidad_productos`.
 - **Ventas** — `routes/ventas.js` → `GET /api/ventas/items`, `PUT /api/ventas/items/:id` (asignar producto_id), `POST /api/ventas` (crear), `GET /api/ventas/:id` (obtener con items), `PUT /api/ventas/:id` (editar solo si cufe IS NULL)
 - **Utilidad** — `routes/facturacion.js` → `GET /api/facturacion/:factura_id/utilidad`, `GET /api/facturacion/utilidad/productos`, `GET /api/facturacion/utilidad/facturas?q=` (lista facturas con totales utilidad)
 - **Categorías** — `routes/categorias.js` → `GET/POST/DELETE /api/productos/categorias` (maestro de categorías)
@@ -68,6 +69,9 @@
 - `pages/Compras.tsx` — Listado de facturas compra
 - `pages/NuevaCompra.tsx` — Subir XML de compra con preview + botón guardar (paso doble: parsear → mostrar → guardar)
 - `pages/Inventario.tsx` — Stock desde `vw_stock_disponible`
+- `pages/IngresosInventario.tsx` — `/inventario/ingresos` Listado de ingresos manuales (fecha, badge origen, producto, cantidad, costo unitario, total, referencia) con filtros, exportar Excel y botón "+ Nuevo Ingreso" (solo `inventario.gestionar`)
+- `pages/NuevoIngresoInventario.tsx` — `/inventario/ingresos/nuevo` Formulario multi-línea para alimentar inventario sin compra: búsqueda de producto por nombre/código con autocomplete (solo inventariables, dropdown vía `createPortal`), cantidad, costo unitario (**vacío = 0**, para regalos/ajustes), fecha, origen (Stock inicial/Ajuste/Otro) y referencia. Guarda vía `POST /api/inventario/entradas`
+- `pages/MovimientosInventario.tsx` — Entradas muestran badge de origen (Compra / Stock inicial / Ajuste / Otro) y descripción con fallback a `referencia` para ingresos manuales
 - `pages/VentasItems.tsx` — Items de venta con filtros, modal asignar producto con consumo FIFO, botones Ver, Gastos y Editar (solo para ventas sin factura, identificadas por `cufe IS NULL`)
 - `pages/Utilidad.tsx` — Tab única "Por Factura": lista de todas las facturas con ingresos, costos y utilidad; búsqueda por N° factura o cliente; columnas ordenables clickeando encabezados; click en fila → detalle (cards resumen + tabla líneas)
 - `pages/Terceros.tsx` — `/terceros` CRUD completo con tabla (avatares por iniciales, badges Cliente/Proveedor), filtros búsqueda + tipo, fila clickeable → modal edición, botón Eliminar solo para admins (`usuarios.gestionar`)
@@ -144,7 +148,29 @@
 - Envío: `Authorization: Bearer <token>` en cada request vía interceptor de axios
 
 ### SSO delegado (maxan-auth) — Fase 4
+> **IMPORTANTE (estado producción, 2026-08)**: a pesar de que `maxan-auth` ya está desplegado y `auth.maxansistemas.com` responde, al entrar a `erp.maxansistemas.com` **NO se redirige a auth**. El ERP sigue usando su login propio. Esto es **esperado** mientras `VITE_AUTH_DELEGATED` no sea `true` en el **build de producción** del frontend. El redirect al SSO solo ocurre cuando el flag está activo en el `.env` que el build de producción compila y se hace rebuild + redeploy.
+
 Integración **FUNCIONAL en dev**. `VITE_AUTH_DELEGATED=true` en `.env.local`.
+
+#### Cómo funciona el login (modo SSO)
+Al acceder al ERP **sin sesión** y con el flag activo:
+1. `erp.maxansistemas.com` (o cualquier 401) → redirige a `auth.maxansistemas.com/login?app=erp&redirect=https://erp.maxansistemas.com/...`
+2. El usuario ingresa credenciales en **auth** → `POST /api/auth/login` (backend auth) valida contra la PostgreSQL compartida (`maxan_db`) y setea cookie httpOnly `maxan_session` en `.maxansistemas.com`.
+3. auth redirige de vuelta al ERP con el JWT en la URL: `https://erp.maxansistemas.com/?token=<jwt>`.
+4. El `AuthContext` del ERP extrae `?token=` (Effect 1) → lo guarda en localStorage → limpia la URL con `replaceState` → valida con `GET /api/auth/me` (Effect 3) → logueado.
+5. Visitas futuras: token en localStorage (Effect 3 valida con `/auth/me`) o restaura por cookie (Effect 2 `fetchAuthSession`).
+
+#### Checklist para activar el SSO en producción
+1. **Frontend ERP** (`.env` del build de producción):
+   ```
+   VITE_AUTH_DELEGATED=true
+   VITE_AUTH_URL=https://auth.maxansistemas.com
+   ```
+   → rebuild + redeploy del frontend (`cd ~/maxan-erp && bash deploy.sh`).
+2. **maxan-auth `.env.prod`** (en `~/maxan-auth`): `JWT_SECRET` idéntico al ERP, `DB_USER/DB_PASSWORD/DB_NAME` completos, `COOKIE_DOMAIN=.maxansistemas.com`, `CORS_ORIGINS=https://erp.maxansistemas.com,...`.
+3. **Ambos backends** comparten la misma PostgreSQL `maxan_db` vía red `maxan_shared`.
+
+> El redirect NO ocurre solo por desplegar auth: depende de que el **peer (ERP)** apunte a él vía `VITE_AUTH_DELEGATED=true` en su build de producción.
 
 - **Código** (frontend, `frontend/src/`):
   - `lib/authSso.ts` — helper SSO: constantes `AUTH_DELEGATED`/`AUTH_URL`, `authLoginUrl()`, `redirectToAuthLogin()`, `fetchAuthSession()`, `authLogout()`. Lee `import.meta.env.VITE_AUTH_DELEGATED` (`=== "true"`) y `VITE_AUTH_URL` (default `https://auth.maxansistemas.com`).
@@ -168,7 +194,7 @@ Integración **FUNCIONAL en dev**. `VITE_AUTH_DELEGATED=true` en `.env.local`.
 ## Schemas SQL
 - `db/init/01_schema.sql` — Schema consolidado (facturacion, compras, inventario, gastos, cartera, usuarios, generales, helpdesk). Se ejecuta automáticamente al crear el contenedor PostgreSQL por primera vez via `docker-entrypoint-initdb.d`.
 - `db/migrar_produccion.sql` — Script para ejecutar en DBeaver contra una BD de producción que se creó antes de tener el schema consolidado. Crea schemas cartera, usuarios, helpdesk y tablas faltantes.
-- Migraciones individuales en `db/`: `01_schema.sql` a `24_terceros_documento_opcional.sql` (histórico, todo consolidado en `db/init/01_schema.sql`)
+- Migraciones individuales en `db/`: `01_schema.sql` a `25_ingresos_inventario.sql` (histórico, todo consolidado en `db/init/01_schema.sql`)
 - `db/migrar_contactos_a_generales.sql` — Migración para mover `helpdesk.contactos` a `generales.contactos` en BD existentes.
 - `db/migrar_terceros_a_generales.sql` — Migración para mover `facturacion.terceros` a `generales.terceros` en BD existentes (ejecutar después de actualizar `01_schema.sql` y backend).
 
@@ -483,3 +509,6 @@ La migración `16_helpdesk_schema.sql` incluye:
 60. **Eliminar venta sin factura** — se agregó `DELETE /api/ventas/:id` (protegido con `ventas.crear`, solo si `cufe IS NULL`). En transacción: desvincula gastos/helpdesk, elimina salidas, items y venta. Botón "Eliminar venta" en el formulario de edición `NuevaVenta.tsx` (solo en modo edición), redirige a `/financiero/facturas` tras eliminar. Eliminado el botón de `VentasItems.tsx`. Backend: `ventasController.remove()`, ruta en `routes/ventas.js`.
 61. **Eliminar producto** — se agregó `DELETE /api/productos/:id` (protegido con `productos.gestionar`). Botón "Eliminar" en el modal de edición de producto en `Productos.tsx` con confirmación. Si el producto tiene registros asociados (gastos, ventas, inventario), retorna error 409. Backend: `productosController.remove()`, ruta en `routes/productos.js`.
 62. **SSO redirect loop (maxan-auth ↔ maxan-erp)** — al habilitar `VITE_AUTH_DELEGATED=true`, el ERP y auth entraban en un loop infinito de redirecciones. Causa: la cookie `maxan_session` se configuraba con `sameSite: "none"` + `secure: true`, que Chrome rechaza en HTTP (dev). Solución en 3 partes: (1) auth backend `sessions.js` cambia cookie a `sameSite: "lax"` + `secure: false` en dev; (2) auth frontend `Login.tsx` pasa el JWT en la URL (`?token=<jwt>`) al redirigir al ERP; (3) ERP `AuthContext.tsx` extrae el token de la URL al montar (Effect 1), lo guarda en localStorage y lo valida con `/auth/me` (Effect 3). Esto elimina la dependencia de la cookie cross-origin para el flujo de login en dev.
+63. **La compra no era la única vía para alimentar inventario** — se creó el módulo de **ingresos de inventario manual** para stock inicial, ajustes por conteo, devoluciones y productos preexistentes (regalo) sin pasar por compra/gasto. Migración `25_ingresos_inventario.sql`: `inventario.entradas.gasto_id` nullable + columnas `origen` (`inicial`/`ajuste`/`otro`) y `referencia`. Endpoints `GET /api/inventario/ingresos` y `POST /api/inventario/entradas` (multi-línea, `inventario.gestionar`). Frontend `IngresosInventario.tsx` (listado + Excel) y `NuevoIngresoInventario.tsx` (formulario multi-línea).
+64. **Costo 0 en ingreso de inventario (regalo/ajuste)** — la validación frontend `!l.costo_unitario` rechazaba el campo **vacío**, y como el placeholder era "0" el usuario creía que ya valía cero (caso típico: producto regalado o stock preexistente). Solución: en `NuevoIngresoInventario.tsx` el campo vacío se interpreta como **costo 0** (`costo_unitario: 0` al enviar) y solo se rechazan negativos/NaN; backend valida con `isNaN(Number(...)) || < 0` aceptando 0. El costo 0 impide que un regalo hinche `costo_adquisiciones` en `vw_utilidad_productos` (margen completo al vender).
+65. **`POST /api/inventario/consumir` sin permiso granular** — el router de inventario no aplicaba `authorize` en ningún endpoint (solo `authenticate` global del `apiRouter`). Se agregó `authorize("inventario.gestionar")` a `consumir` y al nuevo `entradas` en `routes/inventario.js`, siguiendo el patrón del resto del sistema.

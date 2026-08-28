@@ -6,6 +6,7 @@ const SIDEBAR_ITEMS = [
   { to: "/inventario/productos", label: "Productos", icon: "📦", permiso: "productos.ver" },
   { to: "/inventario/stock", label: "Stock", icon: "📊", permiso: "inventario.ver" },
   { to: "/inventario/movimientos", label: "Movimientos", icon: "🔄", permiso: "inventario.ver" },
+  { to: "/inventario/ingresos", label: "Ingresos", icon: "📥", permiso: "inventario.ver" },
 ];
 
 export default function InventarioLayout({ children }: { children: ReactNode }) {

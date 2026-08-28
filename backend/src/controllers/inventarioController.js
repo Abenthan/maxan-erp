@@ -22,7 +22,9 @@ async function movimientos(req, res) {
   try {
     const entradas = await pool.query(
       `SELECT e.id, e.cantidad, e.cantidad_disponible, e.costo_unitario,
-              e.fecha, g.descripcion, 'entrada' AS tipo
+              e.fecha, e.origen, e.referencia,
+              COALESCE(g.descripcion, e.referencia, e.origen) AS descripcion,
+              'entrada' AS tipo
        FROM inventario.entradas e
        LEFT JOIN gastos.gastos g ON g.id = e.gasto_id
        WHERE e.producto_id = $1
@@ -171,4 +173,99 @@ async function consumir(req, res) {
   }
 }
 
-module.exports = { stock, movimientos, consumir };
+async function ingresar(req, res) {
+  const pool = getPool(req);
+
+  const { items, fecha, origen, referencia } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "Debe enviar al menos un producto en items" });
+  }
+  if (!fecha || isNaN(Date.parse(fecha))) {
+    return res.status(400).json({ error: "La fecha es requerida y debe ser válida" });
+  }
+  const origenValido = ["inicial", "ajuste", "otro"];
+  if (origen && !origenValido.includes(origen)) {
+    return res.status(400).json({ error: "El origen debe ser 'inicial', 'ajuste' u 'otro'" });
+  }
+  const origenFinal = origen || "otro";
+
+  for (const item of items) {
+    if (!item.producto_id) {
+      return res.status(400).json({ error: "producto_id es requerido en cada línea" });
+    }
+    if (!item.cantidad || item.cantidad <= 0) {
+      return res.status(400).json({ error: `La cantidad del producto ${item.producto_id} debe ser mayor a 0` });
+    }
+    if (item.costo_unitario == null || isNaN(Number(item.costo_unitario)) || Number(item.costo_unitario) < 0) {
+      return res.status(400).json({ error: `El costo unitario del producto ${item.producto_id} no puede ser negativo` });
+    }
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const creadas = [];
+
+    for (const item of items) {
+      const prodResult = await client.query(
+        "SELECT id, nombre, inventariable FROM inventario.productos WHERE id = $1",
+        [item.producto_id]
+      );
+      if (prodResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: `El producto ${item.producto_id} no existe` });
+      }
+      const producto = prodResult.rows[0];
+      if (!producto.inventariable) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error: `El producto '${producto.nombre}' no es inventariable. Marque 'Inventariable' en el catálogo primero.`,
+        });
+      }
+
+      const entradaResult = await client.query(
+        `INSERT INTO inventario.entradas
+           (producto_id, cantidad, cantidad_disponible, costo_unitario, fecha, origen, referencia)
+         VALUES ($1, $2, $2, $3, $4, $5, $6)
+         RETURNING id, producto_id, cantidad, costo_unitario, fecha, origen, referencia`,
+        [item.producto_id, item.cantidad, item.costo_unitario, fecha, origenFinal, referencia || null]
+      );
+
+      creadas.push(entradaResult.rows[0]);
+    }
+
+    await client.query("COMMIT");
+
+    res.status(201).json({ success: true, entradas: creadas });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error al ingresar inventario:", error.message);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+}
+
+async function listarIngresos(req, res) {
+  const pool = getPool(req);
+
+  try {
+    const result = await pool.query(
+      `SELECT e.id, e.producto_id, p.nombre AS producto_nombre, p.codigo AS producto_codigo,
+              e.cantidad, e.costo_unitario, e.fecha, e.origen, e.referencia, e.created_at
+       FROM inventario.entradas e
+       JOIN inventario.productos p ON p.id = e.producto_id
+       WHERE e.gasto_id IS NULL
+       ORDER BY e.fecha DESC, e.id DESC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al listar ingresos de inventario:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+module.exports = { stock, movimientos, consumir, ingresar, listarIngresos };

@@ -353,12 +353,14 @@ CREATE TRIGGER trg_gastos_set_clasificacion
 -- ---------------------------------------------------------------------
 CREATE TABLE inventario.entradas (
     id                  SERIAL PRIMARY KEY,
-    gasto_id            INT NOT NULL REFERENCES gastos.gastos(id) ON DELETE CASCADE,
+    gasto_id            INT REFERENCES gastos.gastos(id) ON DELETE CASCADE, -- NULL = ingreso manual
     producto_id         INT NOT NULL REFERENCES inventario.productos(id),
     cantidad            NUMERIC(18,6) NOT NULL,
     cantidad_disponible NUMERIC(18,6) NOT NULL,   -- se reduce al consumir vía FIFO
     costo_unitario      NUMERIC(18,2) NOT NULL,
     fecha               DATE NOT NULL,
+    origen              VARCHAR(20) NOT NULL DEFAULT 'gasto', -- 'gasto' | 'inicial' | 'ajuste' | 'otro'
+    referencia          TEXT,                                 -- observación opcional
     created_at          TIMESTAMP DEFAULT now()
 );
 

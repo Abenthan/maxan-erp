@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
+import { usePermiso } from "../context/AuthContext";
 import * as XLSX from "xlsx";
 
 interface StockItem {
@@ -16,6 +17,7 @@ type SortDir = "asc" | "desc";
 export default function Inventario() {
   const api = useApi();
   const navigate = useNavigate();
+  const puedeGestionar = usePermiso("inventario.gestionar");
   const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -103,6 +105,14 @@ export default function Inventario() {
         >
           Exportar a Excel
         </button>
+        {puedeGestionar && (
+          <button
+            onClick={() => navigate("/inventario/ingresos/nuevo")}
+            className="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
+          >
+            + Ingreso de Inventario
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">

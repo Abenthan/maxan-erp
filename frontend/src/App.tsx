@@ -22,6 +22,8 @@ import VentasItems from "./pages/VentasItems";
 import GastosPorVentaItem from "./pages/GastosPorVentaItem";
 import Inventario from "./pages/Inventario";
 import MovimientosInventario from "./pages/MovimientosInventario";
+import IngresosInventario from "./pages/IngresosInventario";
+import NuevoIngresoInventario from "./pages/NuevoIngresoInventario";
 import Utilidad from "./pages/Utilidad";
 import Cartera from "./pages/Cartera";
 import Pagos from "./pages/Pagos";
@@ -94,6 +96,8 @@ function InventarioRoutes() {
         <Route path="nuevo-producto" element={<ProtectedRoute permiso="productos.gestionar"><NuevoProducto /></ProtectedRoute>} />
         <Route path="stock" element={<ProtectedRoute permiso="inventario.ver"><Inventario /></ProtectedRoute>} />
         <Route path="movimientos" element={<ProtectedRoute permiso="inventario.ver"><MovimientosInventario /></ProtectedRoute>} />
+        <Route path="ingresos" element={<ProtectedRoute permiso="inventario.ver"><IngresosInventario /></ProtectedRoute>} />
+        <Route path="ingresos/nuevo" element={<ProtectedRoute permiso="inventario.gestionar"><NuevoIngresoInventario /></ProtectedRoute>} />
       </Routes>
     </InventarioLayout>
   );
