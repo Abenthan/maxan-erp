@@ -33,3 +33,43 @@ Servidor backend escuchando en el puerto 3000
 ◇ injected env (7) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
 Permisos y roles inicializados correctamente
 Servidor backend escuchando en el puerto 3000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+◇ injected env (7) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+[32m[nodemon] restarting due to changes...[39m
+Permisos y roles inicializados correctamente
+Servidor backend escuchando en el puerto 3000
+[32m[nodemon] starting `node src/index.js`[39m
+◇ injected env (7) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+Permisos y roles inicializados correctamente
+Servidor backend escuchando en el puerto 3000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+◇ injected env (7) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+Permisos y roles inicializados correctamente
+Servidor backend escuchando en el puerto 3000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+◇ injected env (7) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Permisos y roles inicializados correctamente
+Servidor backend escuchando en el puerto 3000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+◇ injected env (7) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+Permisos y roles inicializados correctamente
+Servidor backend escuchando en el puerto 3000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+◇ injected env (7) from .env // tip: ⌘ override existing { override: true }
+Permisos y roles inicializados correctamente
+Servidor backend escuchando en el puerto 3000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+◇ injected env (7) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+Permisos y roles inicializados correctamente
+Servidor backend escuchando en el puerto 3000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+◇ injected env (7) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Permisos y roles inicializados correctamente
+Servidor backend escuchando en el puerto 3000

@@ -2,6 +2,62 @@ function getPool(req) {
   return req.app.locals.pool;
 }
 
+class HttpError extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+async function resolverReceptor(client, receptor) {
+  const tipoDocVal = receptor.tipo_documento || null;
+  const numDocVal = receptor.numero_documento || null;
+
+  let receptorId;
+
+  if (receptor.id) {
+    const existe = await client.query(
+      `SELECT id FROM generales.terceros WHERE id = $1`,
+      [receptor.id]
+    );
+    if (existe.rows.length === 0) {
+      throw new HttpError(400, "El cliente seleccionado ya no existe. Selecciónelo nuevamente de la lista.");
+    }
+    receptorId = receptor.id;
+  } else if (tipoDocVal && numDocVal) {
+    const match = await client.query(
+      `SELECT id FROM generales.terceros
+       WHERE tipo_documento = $1 AND numero_documento = $2`,
+      [tipoDocVal, numDocVal]
+    );
+    if (match.rows.length === 0) {
+      throw new HttpError(400, "No existe un cliente registrado con ese documento. Selecciónelo de la lista o créelo en Terceros.");
+    }
+    receptorId = match.rows[0].id;
+  } else {
+    const match = await client.query(
+      `SELECT id FROM generales.terceros
+       WHERE LOWER(BTRIM(razon_social)) = LOWER(BTRIM($1))
+         AND tipo_documento IS NULL AND numero_documento IS NULL`,
+      [receptor.razon_social]
+    );
+    if (match.rows.length === 0) {
+      throw new HttpError(400, "El cliente no existe. Selecciónelo de la lista o créelo en Terceros.");
+    }
+    receptorId = match.rows[0].id;
+  }
+
+  await client.query(
+    `UPDATE generales.terceros SET
+       razon_social = $1, direccion = $2, ciudad = $3, departamento = $4,
+       es_cliente = true, updated_at = now()
+     WHERE id = $5`,
+    [receptor.razon_social, receptor.direccion || null, receptor.ciudad || null, receptor.departamento || null, receptorId]
+  );
+
+  return receptorId;
+}
+
 async function listItems(req, res) {
   const pool = getPool(req);
   const { id, venta_id, descripcion, fecha_desde, fecha_hasta } = req.query;
@@ -101,37 +157,7 @@ async function create(req, res) {
 
     await client.query("BEGIN");
 
-    const tipoDocVal = receptor.tipo_documento || null;
-    const numDocVal = receptor.numero_documento || null;
-
-    let receptorId;
-    if (tipoDocVal && numDocVal) {
-      const result = await client.query(`
-        INSERT INTO generales.terceros
-          (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,true)
-        ON CONFLICT (tipo_documento, numero_documento)
-        DO UPDATE SET
-          razon_social = EXCLUDED.razon_social,
-          direccion = EXCLUDED.direccion,
-          ciudad = EXCLUDED.ciudad,
-          departamento = EXCLUDED.departamento,
-          es_cliente = true,
-          updated_at = now()
-        RETURNING id`,
-        [tipoDocVal, numDocVal, receptor.razon_social, receptor.direccion || null, receptor.ciudad || null, receptor.departamento || null, "CO"]
-      );
-      receptorId = result.rows[0].id;
-    } else {
-      const result = await client.query(`
-        INSERT INTO generales.terceros
-          (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,true)
-        RETURNING id`,
-        [null, null, receptor.razon_social, receptor.direccion || null, receptor.ciudad || null, receptor.departamento || null, "CO"]
-      );
-      receptorId = result.rows[0].id;
-    }
+    const receptorId = await resolverReceptor(client, receptor);
 
     const emisorResult = await client.query(
       `SELECT id FROM generales.terceros WHERE es_propio = true LIMIT 1`
@@ -205,6 +231,9 @@ async function create(req, res) {
     });
   } catch (error) {
     await client.query("ROLLBACK");
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error("Error al crear venta manual:", error.message);
     res.status(500).json({ error: error.message });
   } finally {
@@ -279,37 +308,7 @@ async function update(req, res) {
 
     await client.query("BEGIN");
 
-    const tipoDocVal = receptor.tipo_documento || null;
-    const numDocVal = receptor.numero_documento || null;
-
-    let receptorId;
-    if (tipoDocVal && numDocVal) {
-      const result = await client.query(`
-        INSERT INTO generales.terceros
-          (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,true)
-        ON CONFLICT (tipo_documento, numero_documento)
-        DO UPDATE SET
-          razon_social = EXCLUDED.razon_social,
-          direccion = EXCLUDED.direccion,
-          ciudad = EXCLUDED.ciudad,
-          departamento = EXCLUDED.departamento,
-          es_cliente = true,
-          updated_at = now()
-        RETURNING id`,
-        [tipoDocVal, numDocVal, receptor.razon_social, receptor.direccion || null, receptor.ciudad || null, receptor.departamento || null, "CO"]
-      );
-      receptorId = result.rows[0].id;
-    } else {
-      const result = await client.query(`
-        INSERT INTO generales.terceros
-          (tipo_documento, numero_documento, razon_social, direccion, ciudad, departamento, pais, es_cliente)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,true)
-        RETURNING id`,
-        [null, null, receptor.razon_social, receptor.direccion || null, receptor.ciudad || null, receptor.departamento || null, "CO"]
-      );
-      receptorId = result.rows[0].id;
-    }
+    const receptorId = await resolverReceptor(client, receptor);
 
     const subtotal = items.reduce((s, it) => s + (it.valor_linea || 0), 0);
     const total = items.reduce((s, it) => s + (it.valor_total || it.valor_linea || 0), 0);
@@ -361,6 +360,9 @@ async function update(req, res) {
     });
   } catch (error) {
     await client.query("ROLLBACK");
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error("Error al actualizar venta:", error.message);
     res.status(500).json({ error: error.message });
   } finally {

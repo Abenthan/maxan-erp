@@ -44,6 +44,7 @@ export default function NuevaVenta() {
   const obsRef = useRef<HTMLTextAreaElement>(null);
 
   const [cliente, setCliente] = useState("Ventas sin factura");
+  const [clienteId, setClienteId] = useState<number | null>(null);
   const [nit, setNit] = useState("123456789");
   const [tipoDoc, setTipoDoc] = useState("13");
   const [dir, setDir] = useState("");
@@ -66,7 +67,7 @@ export default function NuevaVenta() {
     if (editandoId) {
       Promise.all([
         api.get<{
-          id: number; fecha_emision: string; observaciones: string; cufe: string | null;
+          id: number; receptor_id: number; fecha_emision: string; observaciones: string; cufe: string | null;
           razon_social: string; numero_documento: string; tipo_documento: string;
           direccion: string; ciudad: string;
           items: { id: number; producto_id: number | null; descripcion: string; codigo_producto: string; cantidad: string; valor_unitario: string; inventariable: boolean; numero_linea: number }[];
@@ -76,6 +77,7 @@ export default function NuevaVenta() {
         .then(([data, prods]) => {
           setProductos(prods);
           setCliente(data.razon_social);
+          setClienteId(data.receptor_id ?? null);
           setNit(data.numero_documento ?? "");
           setTipoDoc(normalizarTipoDoc(data.tipo_documento, data.numero_documento));
           setDir(data.direccion || "");
@@ -149,6 +151,7 @@ export default function NuevaVenta() {
 
   function seleccionarCliente(c: ClienteResult) {
     setCliente(c.razon_social);
+    setClienteId(c.id);
     setNit(c.numero_documento ?? "");
     setTipoDoc(normalizarTipoDoc(c.tipo_documento, c.numero_documento));
     setDir(c.direccion || "");
@@ -294,6 +297,7 @@ export default function NuevaVenta() {
     try {
       const body = {
         receptor: {
+          id: clienteId ?? undefined,
           tipo_documento: tipoDoc,
           numero_documento: nit.trim(),
           razon_social: cliente.trim(),
@@ -414,7 +418,7 @@ export default function NuevaVenta() {
                 <input
                   type="text"
                   value={cliente}
-                  onChange={(e) => { setCliente(e.target.value); setNit(""); setDir(""); setCiudad(""); }}
+                  onChange={(e) => { setCliente(e.target.value); setClienteId(null); setNit(""); setDir(""); setCiudad(""); }}
                   required
                   placeholder="Nombre o razón social"
                   autoComplete="off"

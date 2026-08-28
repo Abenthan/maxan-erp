@@ -1443,6 +1443,15 @@ UPDATE generales.terceros SET es_proveedor = TRUE
 WHERE id IN (SELECT DISTINCT emisor_id FROM facturacion.ventas)
    OR id IN (SELECT DISTINCT proveedor_id FROM compras.facturas_compra);
 
+-- Cliente por defecto para ventas sin factura (el flujo de venta no crea terceros)
+INSERT INTO generales.terceros (tipo_documento, numero_documento, razon_social, es_cliente)
+VALUES ('13', '123456789', 'Ventas sin factura', true)
+ON CONFLICT (tipo_documento, numero_documento)
+DO UPDATE SET
+  razon_social = EXCLUDED.razon_social,
+  es_cliente = true,
+  updated_at = now();
+
 
 -- Tabla maestra de tipos de recurso
 CREATE TABLE IF NOT EXISTS helpdesk.tipos_recurso (
