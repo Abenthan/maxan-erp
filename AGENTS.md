@@ -191,12 +191,15 @@ Al acceder al ERP **sin sesión** y con el flag activo:
   3. ERP extrae token de URL → valida con `/auth/me` → logueado
   4. Visitas futuras: token en localStorage → Effect 3 valida con `/auth/me`
 
-## Schemas SQL
-- `db/init/01_schema.sql` — Schema consolidado (facturacion, compras, inventario, gastos, cartera, usuarios, generales, helpdesk). Se ejecuta automáticamente al crear el contenedor PostgreSQL por primera vez via `docker-entrypoint-initdb.d`.
-- `db/migrar_produccion.sql` — Script para ejecutar en DBeaver contra una BD de producción que se creó antes de tener el schema consolidado. Crea schemas cartera, usuarios, helpdesk y tablas faltantes.
-- Migraciones individuales en `db/`: `01_schema.sql` a `25_ingresos_inventario.sql` (histórico, todo consolidado en `db/init/01_schema.sql`)
-- `db/migrar_contactos_a_generales.sql` — Migración para mover `helpdesk.contactos` a `generales.contactos` en BD existentes.
-- `db/migrar_terceros_a_generales.sql` — Migración para mover `facturacion.terceros` a `generales.terceros` en BD existentes (ejecutar después de actualizar `01_schema.sql` y backend).
+## Schemas SQL (centralizado)
+> El esquema de la BD compartida del ecosistema ya **NO vive en este repo**. La única fuente de verdad es el repositorio **`github.com/Abenthan/maxan-db`** (clonado como `../maxan-db` junto a este proyecto). Este repo **no** tiene carpeta `db/`.
+>
+> - `../maxan-db/init/` — Esquema completo del ecosistema (x00_core, schemas 01..08, tienda 09, vistas 90, FKs cross-schema 99). El `postgres` de `docker-compose.dev.yml` y `docker-compose.prod.yml` lo monta en `docker-entrypoint-initdb.d` y se ejecuta automáticamente al crear el volumen la primera vez.
+> - `../maxan-db/seeds/` — Datos maestros idempotentes (permisos, roles, catálogos). No se montan en initdb automático; se aplican manualmente/por deploy.
+> - `../maxan-db/legacy/` — Historial de `db/` del monolito (01..26 + migrar_* + fix_*) archivado solo como referencia, NO fuente del init.
+> - `../maxan-db/design.md` — Documentación del diseño y del ensamblado del esquema.
+>
+> Si pasas a trabajar con una copia de este repo sin `maxan-db` al lado, clónalo: `git clone https://github.com/Abenthan/maxan-db.git`.
 
 ## Schema `generales` (tablas compartidas entre módulos)
 - **terceros** — Clientes, proveedores y emisores (migrado desde `facturacion.terceros`).

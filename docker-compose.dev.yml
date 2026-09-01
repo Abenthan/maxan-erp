@@ -1,7 +1,7 @@
 # ============================================================
 # maxan-erp — DESARROLLO
 # Levanta postgres + backend (nodemon) + frontend (Vite HMR).
-# La BD se inicializa automáticamente desde db/init/.
+# La BD se inicializa automáticamente desde ../maxan-db/init/ (repo centralizado).
 #
 # Uso:
 #   docker compose -f docker-compose.dev.yml up
@@ -28,7 +28,8 @@ services:
       - "5433:5432"
     volumes:
       - maxan_db_data:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d
+      # Esquema compartido del ecosistema: repo maxan-db (única fuente de verdad).
+      - ../maxan-db/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

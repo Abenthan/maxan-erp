@@ -11,7 +11,8 @@ services:
       - "127.0.0.1:5433:5432"   # host:5433 → container:5432 (interno siempre 5432)
     volumes:
       - maxan_db_data:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d
+      # Esquema compartido del ecosistema: repo maxan-db clonado junto a maxan-erp (única fuente de verdad).
+      - ../maxan-db/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
