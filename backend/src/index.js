@@ -19,6 +19,7 @@ const inventarioRouter = require("./routes/inventario");
 const facturacionRouter = require("./routes/facturacion");
 const ventasRouter = require("./routes/ventas");
 const categoriasRouter = require("./routes/categorias");
+const imagenesRouter = require("./routes/imagenes");
 const dashboardRouter = require("./routes/dashboard");
 const carteraRouter = require("./routes/cartera");
 const clasificacionesGastoRouter = require("./routes/clasificacionesGasto");
@@ -72,6 +73,7 @@ apiRouter.use(authenticate);
 
 apiRouter.use("/facturas", facturasRouter);
 apiRouter.use("/productos/categorias", categoriasRouter);
+apiRouter.use("/productos/:producto_id/imagenes", imagenesRouter);
 apiRouter.use("/productos", productosRouter);
 apiRouter.use("/gastos/clasificaciones", clasificacionesGastoRouter);
 apiRouter.use("/gastos", gastosRouter);

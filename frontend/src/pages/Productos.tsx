@@ -2,6 +2,16 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApi } from "../context/ApiContext";
 import { usePermiso } from "../context/AuthContext";
+import ImagenesProducto from "../components/ImagenesProducto";
+
+interface Imagen {
+  id: number;
+  producto_id: number;
+  url: string;
+  es_principal: boolean;
+  orden: number;
+  created_at: string;
+}
 
 interface Producto {
   id: number;
@@ -44,6 +54,7 @@ export default function Productos() {
   const [nuevaCat, setNuevaCat] = useState("");
   const [creandoCat, setCreandoCat] = useState(false);
   const [catError, setCatError] = useState("");
+  const [imagenesEdit, setImagenesEdit] = useState<Imagen[]>([]);
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -76,6 +87,7 @@ export default function Productos() {
     setCategoria("");
     setUnidad("UND");
     setInventariable(true);
+    setImagenesEdit([]);
   }
 
   function seleccionar(p: Producto) {
@@ -86,6 +98,8 @@ export default function Productos() {
     setCategoria(p.categoria);
     setUnidad(p.unidad_medida);
     setInventariable(p.inventariable);
+    // Cargar imágenes del producto
+    api.get<Imagen[]>(`/productos/${p.id}/imagenes`).then(setImagenesEdit).catch(() => setImagenesEdit([]));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -334,6 +348,13 @@ export default function Productos() {
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <label htmlFor="inventariable-modal" className="text-sm text-gray-700">Inventariable</label>
+              </div>
+              <div className="sm:col-span-2">
+                <ImagenesProducto
+                  productoId={editId!}
+                  imagenes={imagenesEdit}
+                  onActualizar={setImagenesEdit}
+                />
               </div>
               <div className="sm:col-span-2 flex justify-between gap-3 pt-2">
                 <button

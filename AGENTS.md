@@ -47,6 +47,7 @@
 ## Nuevos módulos backend
 - **Clientes** — `routes/terceros.js` → `GET /api/terceros` (con filtro `?q=`, `?tipo=cliente|proveedor`, `?tipo_documento=`), `GET /api/terceros/:id`, `POST /api/terceros` (crear/upsert con `es_cliente`/`es_proveedor`), `PUT /api/terceros/:id`, `DELETE /api/terceros/:id` (protegido con `authorize("terceros.gestionar")` + verifica `usuarios.gestionar` en controller — solo admins). `tipo_documento` y `numero_documento` opcionales (migración `24_terceros_documento_opcional.sql`).
 - **Productos** — `routes/productos.js` → `POST/GET/PUT /api/productos`, `GET/POST/DELETE /api/productos/categorias`
+- **Imágenes de Productos** — `routes/imagenes.js` → `GET/POST /api/productos/:producto_id/imagenes`, `DELETE /:id`, `PATCH /:id/principal`, `PATCH /reordenar`. Sube a Cloudflare R2 (bucket `maxan-erp`), almacena URLs en `inventario.imagenes`. Requiere `productos.gestionar` para escritura. Config R2 en `config/r2.js`. Variables de entorno: `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL`.
 - **Gastos** — `routes/gastos.js` → `POST/GET /api/gastos`, `PUT /api/gastos/:id`, `PUT /api/gastos/:id/vincular` (vincular/desvincular a venta_item_id), filtros `?producto_id=`, `?venta_item_id=`, `?sin_vinculo=true`
 - **Clasificaciones de Gasto** — `routes/clasificacionesGasto.js` → `GET/POST/DELETE /api/gastos/clasificaciones` (maestro como categorías de producto, con FK en `gastos.gastos.clasificacion`)
 - **Compras** — `routes/compras.js` → `POST /api/compras/upload` (multer + reuso de `parseInvoiceXML`), `POST /api/compras/parsear-xml` (solo parseo, sin guardar), `GET /api/compras`
@@ -64,7 +65,8 @@
 ## Frontend módulos (implementados)
 - `pages/Dashboard.tsx` — Página principal `/` con cards de resumen, barras ventas/gastos/clasificación, top clientes, últimas facturas, utilidad por producto. Filtros: mes (select últimos 12 meses), cliente, factura ID.
 - `pages/Contactos.tsx` — CRUD completo de contactos en `/bases-de-datos/contactos`. Tabla con Nombre, Cliente, Teléfono, Email, WhatsApp, Cargo, Estado. Filtros: búsqueda + cliente. Modal edición/creación. Eliminar solo admins (`usuarios.gestionar`).
-- `pages/Productos.tsx` — Listado de catálogo con filtros (búsqueda + categoría), tabla, formulario crear/editar abajo, links a Stock y Gastos
+- `pages/Productos.tsx` — Listado de catálogo con filtros (búsqueda + categoría), tabla, formulario crear/editar abajo, links a Stock y Gastos. **Modal edición incluye componente `ImagenesProducto`** para subir/eliminar/reordenar/definir principal de fotos del producto (Cloudflare R2).
+- `components/ImagenesProducto.tsx` — Grid de thumbnails con drag-drop upload, botón ★ principal, ✕ eliminar, drag para reordenar. Límite 10 imágenes, 5MB max, JPG/PNG/WebP.
 - `pages/Gastos.tsx` — Tabla de gastos con filtros (descripción + rango fechas + producto_id por URL), sin scroll vertical, fila clickeable para editar en modal, botón "+ Nuevo Gasto" en el header que navega a `/financiero/nuevo-gasto`. Clasificación con select + ⚙. Modal VinculoProductoModal para vincular/desvincular producto. Botón "Producto" por fila.
 - `pages/Compras.tsx` — Listado de facturas compra
 - `pages/NuevaCompra.tsx` — Subir XML de compra con preview + botón guardar (paso doble: parsear → mostrar → guardar)
