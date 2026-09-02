@@ -2,3 +2,4 @@
 !.env.production.example
 backend/.env.production.example
 backups/
+CF_R2_Maxan-erp.md
