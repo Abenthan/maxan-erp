@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
+/* margin: 0 para que Chrome no dibuje fecha/hora/título/URL en el margen.
+   El espaciado de la hoja lo da el propio padding de #reporte-imprimir. */
 @page {
   size: A4;
-  margin: 12mm;
+  margin: 0;
 }
 
 @media print {
@@ -42,7 +44,6 @@
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
-    padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
   }

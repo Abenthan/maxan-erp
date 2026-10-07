@@ -86,17 +86,13 @@ export default function ReporteDocumento({ data }: { data: ReporteDocumentoData 
 
       {data.detalles.length > 0 && (
         <Seccion titulo="Actuaciones">
-          <div className="space-y-4">
+            <ul className="space-y-1.5">
             {data.detalles.map((d) => (
-              <div key={d.id}>
-                <p className="text-[11px] font-semibold text-blue-600">
-                  {fechaHora(d.created_at)} · {d.tipo} · {d.autor}
-                </p>
-                {d.recurso && <p className="text-[11px] italic text-gray-500">Recurso: {d.recurso}</p>}
-                <p className="text-sm text-gray-700 whitespace-pre-wrap mt-0.5">{d.contenido}</p>
-              </div>
+              <li key={d.id} className="text-sm text-gray-700 whitespace-pre-wrap mt-0.5">
+                • {d.contenido}
+              </li>
             ))}
-          </div>
+            </ul>
         </Seccion>
       )}
 
