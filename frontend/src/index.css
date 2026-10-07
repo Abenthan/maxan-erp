@@ -1,1 +1,53 @@
 @import "tailwindcss";
+
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* Fallback: solo el reporte es visible (el resto queda oculto) */
+  body * {
+    visibility: hidden !important;
+  }
+
+  #reporte-imprimir,
+  #reporte-imprimir * {
+    visibility: visible !important;
+  }
+
+  /* Ancestros del reporte: sin estilos de pantalla que desalineen la hoja */
+  body *:has(#reporte-imprimir) {
+    display: block !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+  }
+
+  /* Todo lo que no sea el reporte se elimina del flujo (evita páginas en blanco) */
+  body *:not(#reporte-imprimir):not(#reporte-imprimir *):not(:has(#reporte-imprimir)) {
+    display: none !important;
+  }
+
+  #reporte-imprimir {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  #reporte-imprimir tr {
+    break-inside: avoid;
+  }
+}

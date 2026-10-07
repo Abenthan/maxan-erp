@@ -1,11 +1,15 @@
-import { EMPRESA, fechaCorta, fechaHora, fechaLarga, type ReporteDocumentoData } from "../lib/reportes";
+import { EMPRESA, fechaCorta, fechaHora, type ReporteDocumentoData } from "../lib/reportes";
 
-function Dato({ label, valor }: { label: string; valor?: string | null }) {
+function DatoFila({ label, valor }: { label: string; valor?: string | null }) {
   return (
-    <div>
-      <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400">{label}</span>
-      <span className="text-sm text-gray-900">{valor && valor.trim() ? valor : "—"}</span>
-    </div>
+    <tr className="border-b border-gray-100">
+      <td className="w-56 px-3 py-2 align-top bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        {label}
+      </td>
+      <td className="px-3 py-2 align-top text-sm text-gray-900">
+        {valor && valor.trim() ? valor : "—"}
+      </td>
+    </tr>
   );
 }
 
@@ -22,12 +26,15 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
 
 export default function ReporteDocumento({ data }: { data: ReporteDocumentoData }) {
   return (
-    <div className="bg-white shadow-lg border border-gray-200 rounded-sm mx-auto w-full max-w-3xl px-10 py-9 print:shadow-none print:border-none">
+    <div
+      id="reporte-imprimir"
+      className="bg-white shadow-lg border border-gray-200 rounded-sm mx-auto w-full max-w-3xl px-10 py-9 print:shadow-none print:border-none"
+    >
       <header className="flex items-start justify-between gap-6">
         <img src="/logo-maxan.svg" alt="Maxan Sistemas" className="h-11 w-auto" />
         <div className="text-right">
-          <p className="text-lg font-bold text-gray-900 leading-tight">{EMPRESA.nombre}</p>
-          <p className="text-xs text-gray-500">{EMPRESA.telefono} &nbsp;·&nbsp; {EMPRESA.website}</p>
+          <p className="text-lg font-bold text-gray-900 leading-tight">{EMPRESA.slogan}</p>
+          <p className="text-xs text-gray-500 mt-2">{EMPRESA.telefono} &nbsp;·&nbsp; {EMPRESA.website}</p>
         </div>
       </header>
 
@@ -38,22 +45,17 @@ export default function ReporteDocumento({ data }: { data: ReporteDocumentoData 
         <h2 className="text-xl font-bold text-gray-900">REPORTE DE SERVICIO</h2>
         <span className="text-xl font-bold text-blue-600">N° {data.numeroReporte}</span>
       </div>
-      <p className="text-xs text-gray-500 mt-1">Fecha de emisión: {fechaLarga(data.created_at)}</p>
 
-      <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4 border-t border-gray-100 pt-4">
-        <Dato label="Cliente" valor={data.cliente_nombre} />
-        <Dato
-          label="Documento"
-          valor={data.cliente_documento ? `${data.cliente_tipo_documento || ""} ${data.cliente_documento}`.trim() : null}
-        />
-        <Dato label="Contacto" valor={data.contacto_nombre} />
-        <Dato label="Teléfono" valor={data.contacto_telefono || data.contacto_whatsapp} />
-        <Dato label="Caso" valor={data.caso_numero} />
-        <Dato label="Estado" valor={data.caso_estado} />
-        <Dato label="Categoría" valor={data.categoria_nombre} />
-        <Dato label="Técnico" valor={data.tecnico_nombre} />
-        <Dato label="Fecha del caso" valor={fechaCorta(data.caso_fecha)} />
-        <Dato label="Fuente" valor={data.fuente} />
+      <div className="mt-6 border-t border-gray-100 pt-4">
+        <table className="w-full border-collapse text-sm">
+          <tbody>
+            <DatoFila label="Cliente" valor={data.cliente_nombre} />
+            <DatoFila label="Caso" valor={data.caso_numero} />
+            <DatoFila label="Fecha del caso" valor={fechaCorta(data.caso_fecha)} />
+            <DatoFila label="Servicio solicitado por" valor={data.contacto_nombre} />
+            <DatoFila label="Técnico" valor={data.tecnico_nombre} />
+          </tbody>
+        </table>
       </div>
 
       <Seccion titulo="Descripción del caso">

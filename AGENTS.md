@@ -459,8 +459,8 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/helpdesk/categorias-caso` | `CategoriasCaso.tsx` | `helpdesk.casos.gestionar` | Administrar categorías (agregar/eliminar con selector de color). |
 | `/helpdesk/tipos-detalle` | `TiposDetalle.tsx` | `helpdesk.casos.gestionar` | Administrar tipos de detalle (agregar/eliminar con selector de color). |
 | `/helpdesk/configuracion` | `ConfiguracionHelpdesk.tsx` | `helpdesk.ver` | Página de configuración Helpdesk con cards de acceso a Categorías, Tipos de Detalle y Todos los Recursos. |
-| `/helpdesk/reportes` | `Reportes.tsx` | `helpdesk.reportes.ver` | Listado de reportes (filtrado por cliente del HelpdeskContext, o de todos si no hay cliente), búsqueda, botón **+ Nuevo reporte** (modal para elegir caso) y **PDF** por fila. |
-| `/helpdesk/reportes/:id` | `ReporteDetalle.tsx` | `helpdesk.reportes.ver` | Documento en pantalla (membrete + logo) con botones **Descargar PDF** y **Ver caso**. |
+| `/helpdesk/reportes` | `Reportes.tsx` | `helpdesk.reportes.ver` | Listado de reportes (filtrado por cliente del HelpdeskContext, o de todos si no hay cliente), búsqueda, botón **+ Nuevo reporte** (modal para elegir caso) y **Ver** por fila (sin descarga de PDF). |
+| `/helpdesk/reportes/:id` | `ReporteDetalle.tsx` | `helpdesk.reportes.ver` | Documento en pantalla (membrete + logo) con botones **Imprimir** (`window.print()`, imprime solo el reporte) y **Ver caso**. |
 
 ### Permisos (seed automático)
 | Código | Módulo | Descripción |
@@ -522,16 +522,17 @@ Cada caso puede tener 0..N reportes; cada reporte es un **documento consecutivo*
 - `seed/permisos.js` incluye los 2 permisos y los asigna: `ver` → Admin/Operador/Consultor, `gestionar` → Admin/Operador (se siembra solo al arrancar con nodemon).
 
 **Frontend**
-- `src/lib/reportes.ts` — tipos (`ReporteFila`, `ReporteDetalle`, `ReporteDocumentoData`, `ReporteRecurso`), `EMPRESA` (membrete hardcodeado: "Maxan Sistemas", "313 485 0115", "maxansistemas.com"), `fechaCorta/fechaLarga/fechaHora`, `logoPng()` (SVG→PNG en canvas) y `generarReportePdf()` con **jsPDF** (A4: membrete, título, grid de datos, secciones, paginación con footer).
-- `src/components/ReporteDocumento.tsx` — la hoja en pantalla es espejo del PDF (misma proporción, fuente `font-mono`).
-- `pages/helpdesk/Reportes.tsx` (listado) y `pages/helpdesk/ReporteDetalle.tsx` (documento + Descargar PDF + Ver caso).
+- `src/lib/reportes.ts` — tipos (`ReporteFila`, `ReporteDetalle`, `ReporteDocumentoData`, `ReporteRecurso`), `EMPRESA` (membrete hardcodeado: "Maxan Sistemas", "313 485 0115", "maxansistemas.com") y `fechaCorta/fechaLarga/fechaHora`. Sin generación de PDF (jsPDF eliminado).
+- `src/components/ReporteDocumento.tsx` — la hoja en pantalla **es** el documento que se imprime (id `#reporte-imprimir`); cabecera = tabla de 2 columnas (etiqueta | valor) con Cliente, Caso, Fecha del caso, Servicio solicitado por y Técnico.
+- `pages/helpdesk/Reportes.tsx` (listado, solo botón **Ver**) y `pages/helpdesk/ReporteDetalle.tsx` (documento + botón **Imprimir** → `window.print()` + **Ver caso**).
+- `src/index.css` — estilos `@media print`: `@page { size: A4; margin: 12mm }`, todo el DOM oculto salvo `#reporte-imprimir` (visible + `display:none` en el resto vía `:has()` para evitar páginas en blanco), reporte posicionado absoluto a 0,0 y `break-inside: avoid` en filas. El usuario elige imprimir o "Guardar como PDF" en el diálogo del navegador.
 - En `pages/helpdesk/CasoDetalle.tsx` hay una sección **Reportes**: chips con los reportes del caso + botón **+ Generar reporte**.
 - Rutas en `App.tsx` con `permiso="helpdesk.reportes.ver"`; item **Reportes** en `components/HelpdeskLayoutSidebar.tsx`.
-- Logo: `frontend/public/logo-maxan.svg` (viewBox `0 0 1855.59 475.38` → ratio alto/ancho ≈ 0.2562, usarlo para calcular la altura del logo en el PDF).
+- Logo: `frontend/public/logo-maxan.svg` (viewBox `0 0 1855.59 475.38` → ratio alto/ancho ≈ 0.2562) — solo en pantalla, ya no se rasteriza para PDF.
 
 **Decisiones / estado**
 - Contenido del reporte = datos del caso (no hay campo de texto libre en la tabla).
-- PDF en el **frontend** con `jspdf@4.2.1` (no jsPDF autógrafo, ni backend).
+- **Impresión con el navegador**: botón "Imprimir" → `window.print()`; el PDF lo genera/guarda el usuario desde el diálogo (imprimir o "Guardar como PDF"). jsPDF fue eliminado del frontend (dependencia + `generarReportePdf`).
 - `numeroReporte`: entero solo, sin prefijo, arranca en **1000**.
 - Pruebas de API hechas con JWT manual (`JWT_SECRET` default `maxan-erp-secret-dev`); reportes de prueba borrados y sequence reiniciada → el próximo usuario real obtiene 1000.
 - Verificar con `npx tsc -b` y `npm run build`. El ESLint del repo ya falla con errores preexistentes (`@typescript-eslint/no-explicit-any`, `react-hooks/set-state-in-effect`) — el código nuevo sigue ese estilo.

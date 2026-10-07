@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useApi } from "../../context/ApiContext";
 import { usePermiso } from "../../context/AuthContext";
 import { useHelpdesk } from "../../context/HelpdeskContext";
-import { fechaCorta, generarReportePdf, type ReporteFila, type ReporteDocumentoData } from "../../lib/reportes";
+import { fechaCorta, type ReporteFila } from "../../lib/reportes";
 
 interface Caso {
   id: number;
@@ -28,7 +28,6 @@ export default function Reportes() {
   const [casos, setCasos] = useState<Caso[]>([]);
   const [qCasos, setQCasos] = useState("");
   const [creando, setCreando] = useState(false);
-  const [descargandoId, setDescargandoId] = useState<number | null>(null);
 
   const cargar = useCallback(() => {
     setCargando(true);
@@ -65,18 +64,6 @@ export default function Reportes() {
       alert(e.message || "Error al crear el reporte");
     } finally {
       setCreando(false);
-    }
-  }
-
-  async function descargar(r: ReporteFila) {
-    setDescargandoId(r.id);
-    try {
-      const data = await api.get<ReporteDocumentoData>(`/helpdesk/reportes/${r.id}`);
-      await generarReportePdf(data);
-    } catch (e: any) {
-      alert(e.message || "Error al generar el PDF");
-    } finally {
-      setDescargandoId(null);
     }
   }
 
@@ -136,16 +123,9 @@ export default function Reportes() {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/helpdesk/reportes/${r.id}`); }}
-                      className="text-xs text-amber-600 hover:text-amber-800 font-medium mr-3"
+                      className="text-xs text-amber-600 hover:text-amber-800 font-medium"
                     >
                       Ver
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); descargar(r); }}
-                      disabled={descargandoId === r.id}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
-                    >
-                      {descargandoId === r.id ? "Generando..." : "PDF"}
                     </button>
                   </td>
                 </tr>

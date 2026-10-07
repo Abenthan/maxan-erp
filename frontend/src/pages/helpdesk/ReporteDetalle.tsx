@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useApi } from "../../context/ApiContext";
 import ReporteDocumento from "../../components/ReporteDocumento";
-import { generarReportePdf, type ReporteDocumentoData } from "../../lib/reportes";
+import type { ReporteDocumentoData } from "../../lib/reportes";
 
 export default function ReporteDetalle() {
   const { id } = useParams();
@@ -11,7 +11,6 @@ export default function ReporteDetalle() {
 
   const [reporte, setReporte] = useState<ReporteDocumentoData | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [descargando, setDescargando] = useState(false);
 
   useEffect(() => {
     api.get<ReporteDocumentoData>(`/helpdesk/reportes/${id}`)
@@ -19,18 +18,6 @@ export default function ReporteDetalle() {
       .catch(() => navigate("/helpdesk/reportes"))
       .finally(() => setCargando(false));
   }, [id, api, navigate]);
-
-  async function descargar() {
-    if (!reporte) return;
-    setDescargando(true);
-    try {
-      await generarReportePdf(reporte);
-    } catch (e: any) {
-      alert(e.message || "Error al generar el PDF");
-    } finally {
-      setDescargando(false);
-    }
-  }
 
   if (cargando) return <p className="text-center py-12 text-gray-400">Cargando reporte...</p>;
   if (!reporte) return <p className="text-center py-12 text-gray-400">Reporte no encontrado</p>;
@@ -52,11 +39,10 @@ export default function ReporteDetalle() {
             Ver caso
           </button>
           <button
-            onClick={descargar}
-            disabled={descargando}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+            onClick={() => window.print()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700"
           >
-            {descargando ? "Generando PDF..." : "Descargar PDF"}
+            Imprimir
           </button>
         </div>
       </div>
