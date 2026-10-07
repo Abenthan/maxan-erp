@@ -1,4 +1,4 @@
-import { EMPRESA, fechaCorta, fechaHora, type ReporteDocumentoData } from "../lib/reportes";
+import { EMPRESA, fechaCorta, type ReporteDocumentoData } from "../lib/reportes";
 
 function DatoFila({ label, valor }: { label: string; valor?: string | null }) {
   return (
