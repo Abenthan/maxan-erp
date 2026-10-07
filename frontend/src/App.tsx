@@ -46,6 +46,8 @@ import RegistrarPC from "./pages/helpdesk/RegistrarPC";
 import Casos from "./pages/helpdesk/Casos";
 import CasoDetalle from "./pages/helpdesk/CasoDetalle";
 import CasoNuevo from "./pages/helpdesk/CasoNuevo";
+import Reportes from "./pages/helpdesk/Reportes";
+import ReporteDetalle from "./pages/helpdesk/ReporteDetalle";
 import NuevoRecurso from "./pages/helpdesk/NuevoRecurso";
 import Mantenimientos from "./pages/helpdesk/Mantenimientos";
 import MantenimientoNuevo from "./pages/helpdesk/MantenimientoNuevo";
@@ -154,6 +156,8 @@ function HelpdeskRoutes() {
         <Route path="casos" element={<ProtectedRoute permiso="helpdesk.casos.ver"><Casos /></ProtectedRoute>} />
         <Route path="casos/nuevo" element={<ProtectedRoute permiso="helpdesk.casos.gestionar"><CasoNuevo /></ProtectedRoute>} />
         <Route path="casos/:id" element={<ProtectedRoute permiso="helpdesk.casos.ver"><CasoDetalle /></ProtectedRoute>} />
+        <Route path="reportes" element={<ProtectedRoute permiso="helpdesk.reportes.ver"><Reportes /></ProtectedRoute>} />
+        <Route path="reportes/:id" element={<ProtectedRoute permiso="helpdesk.reportes.ver"><ReporteDetalle /></ProtectedRoute>} />
         <Route path="mantenimientos" element={<ProtectedRoute permiso="helpdesk.ver"><Mantenimientos /></ProtectedRoute>} />
         <Route path="mantenimientos/nuevo" element={<ProtectedRoute permiso="helpdesk.gestionar"><MantenimientoNuevo /></ProtectedRoute>} />
         <Route path="mantenimientos/:id" element={<ProtectedRoute permiso="helpdesk.ver"><MantenimientoDetalle /></ProtectedRoute>} />

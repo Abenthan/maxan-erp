@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useApi } from "../../context/ApiContext";
 import { usePermiso } from "../../context/AuthContext";
+import { fechaCorta, type ReporteFila } from "../../lib/reportes";
 
 interface Caso {
   id: number; numero: string; titulo: string; descripcion: string;
@@ -46,9 +47,12 @@ export default function CasoDetalle() {
   const api = useApi();
   const navigate = useNavigate();
   const puedeGestionar = usePermiso("helpdesk.casos.gestionar");
+  const puedeVerReportes = usePermiso("helpdesk.reportes.ver");
+  const puedeCrearReportes = usePermiso("helpdesk.reportes.gestionar");
 
   const [caso, setCaso] = useState<Caso | null>(null);
   const [detalles, setDetalles] = useState<Detalle[]>([]);
+  const [reportes, setReportes] = useState<ReporteFila[]>([]);
   const [cargando, setCargando] = useState(true);
   const [nuevoDetalle, setNuevoDetalle] = useState("");
   const [nuevoTipo, setNuevoTipo] = useState("Comentario");
@@ -84,6 +88,25 @@ export default function CasoDetalle() {
       .finally(() => setCargando(false));
     api.get<TipoDetalle[]>("/helpdesk/tipos-detalle").then(setTipos).catch(() => {});
   }, [id, api, navigate]);
+
+  useEffect(() => {
+    if (!puedeVerReportes) return;
+    api.get<ReporteFila[]>(`/helpdesk/reportes?caso_id=${id}`)
+      .then(setReportes)
+      .catch(() => {});
+  }, [id, api, puedeVerReportes]);
+
+  async function generarReporte() {
+    setGuardando(true);
+    try {
+      const r = await api.post<{ id: number }>("/helpdesk/reportes", { idCaso: Number(id) });
+      navigate(`/helpdesk/reportes/${r.id}`);
+    } catch (e: any) {
+      alert(e.message || "Error al crear el reporte");
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   function iniciarEdicion() {
     if (!caso) return;
@@ -456,6 +479,40 @@ export default function CasoDetalle() {
           </div>
         )}
       </div>
+
+      {puedeVerReportes && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">Reportes</h3>
+            {puedeCrearReportes && (
+              <button
+                onClick={generarReporte}
+                disabled={guardando}
+                className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-50"
+              >
+                {guardando ? "Generando..." : "+ Generar reporte"}
+              </button>
+            )}
+          </div>
+          {reportes.length === 0 ? (
+            <p className="text-sm text-gray-400">Este caso aún no tiene reportes</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {reportes.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => navigate(`/helpdesk/reportes/${r.id}`)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100"
+                >
+                  <span className="font-mono font-semibold">N° {r.numeroReporte}</span>
+                  <span className="text-blue-400">·</span>
+                  <span>{fechaCorta(r.created_at)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Bitácora</h3>

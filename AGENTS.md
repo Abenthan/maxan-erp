@@ -47,7 +47,7 @@
 ## Nuevos módulos backend
 - **Clientes** — `routes/terceros.js` → `GET /api/terceros` (con filtro `?q=`, `?tipo=cliente|proveedor`, `?tipo_documento=`), `GET /api/terceros/:id`, `POST /api/terceros` (crear/upsert con `es_cliente`/`es_proveedor`), `PUT /api/terceros/:id`, `DELETE /api/terceros/:id` (protegido con `authorize("terceros.gestionar")` + verifica `usuarios.gestionar` en controller — solo admins). `tipo_documento` y `numero_documento` opcionales (migración `24_terceros_documento_opcional.sql`).
 - **Productos** — `routes/productos.js` → `POST/GET/PUT /api/productos`, `GET/POST/DELETE /api/productos/categorias`
-- **Imágenes de Productos** — `routes/imagenes.js` → `GET/POST /api/productos/:producto_id/imagenes`, `DELETE /:id`, `PATCH /:id/principal`, `PATCH /reordenar`. Sube a Cloudflare R2 (bucket `maxan-erp`), almacena URLs en `inventario.imagenes`. Requiere `productos.gestionar` para escritura. Config R2 en `config/r2.js`. Variables de entorno: `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL`.
+- **Imágenes de Productos** — `routes/imagenes.js` → `GET/POST /api/productos/:producto_id/imagenes`, `DELETE /:id`, `PATCH /:id/principal`, `PATCH /reordenar`. Sube a Cloudflare R2 (bucket `maxan-erp`), almacena URLs en `inventario.imagenes`. Requiere `productos.gestionar` para escritura. Config R2 en `config/r2.js`. Variables de entorno: `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL`. **`R2_PUBLIC_URL` debe ser una URL pública del bucket** (acceso público habilitado → `https://pub-<hash>.r2.dev`, o un dominio personalizado). **NO usar el endpoint S3 API** (`...r2.cloudflarestorage.com/<bucket>`): es privado, exige firma SigV4 y el navegador muestra la imagen rota.
 - **Gastos** — `routes/gastos.js` → `POST/GET /api/gastos`, `PUT /api/gastos/:id`, `PUT /api/gastos/:id/vincular` (vincular/desvincular a venta_item_id), filtros `?producto_id=`, `?venta_item_id=`, `?sin_vinculo=true`
 - **Clasificaciones de Gasto** — `routes/clasificacionesGasto.js` → `GET/POST/DELETE /api/gastos/clasificaciones` (maestro como categorías de producto, con FK en `gastos.gastos.clasificacion`)
 - **Compras** — `routes/compras.js` → `POST /api/compras/upload` (multer + reuso de `parseInvoiceXML`), `POST /api/compras/parsear-xml` (solo parseo, sin guardar), `GET /api/compras`
@@ -440,6 +440,9 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/api/helpdesk/tipos-detalle` | GET | `helpdesk.casos.ver` | Listar tipos de detalle (Comentario, Diagnóstico, etc.) |
 | `/api/helpdesk/tipos-detalle` | POST | `helpdesk.casos.gestionar` | Crear tipo de detalle (nombre + color) |
 | `/api/helpdesk/tipos-detalle/:id` | DELETE | `helpdesk.casos.gestionar` | Eliminar tipo de detalle (solo si no está en uso) |
+| `/api/helpdesk/reportes` | GET | `helpdesk.reportes.ver` | Listar reportes (filtros: `cliente_id`, `caso_id`, `q`) — incluye datos del caso y cliente |
+| `/api/helpdesk/reportes/:id` | GET | `helpdesk.reportes.ver` | Documento completo: reporte + caso + cliente + contacto + técnico + `recursos` + `detalles` (bitácora) en JSON |
+| `/api/helpdesk/reportes` | POST | `helpdesk.reportes.gestionar` | Crear reporte `{ idCaso }` → devuelve `numeroReporte` consecutivo (arranca en 1000) |
 
 ### Frontend — Páginas
 | Ruta | Componente | Permiso | Descripción |
@@ -456,6 +459,8 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `/helpdesk/categorias-caso` | `CategoriasCaso.tsx` | `helpdesk.casos.gestionar` | Administrar categorías (agregar/eliminar con selector de color). |
 | `/helpdesk/tipos-detalle` | `TiposDetalle.tsx` | `helpdesk.casos.gestionar` | Administrar tipos de detalle (agregar/eliminar con selector de color). |
 | `/helpdesk/configuracion` | `ConfiguracionHelpdesk.tsx` | `helpdesk.ver` | Página de configuración Helpdesk con cards de acceso a Categorías, Tipos de Detalle y Todos los Recursos. |
+| `/helpdesk/reportes` | `Reportes.tsx` | `helpdesk.reportes.ver` | Listado de reportes (filtrado por cliente del HelpdeskContext, o de todos si no hay cliente), búsqueda, botón **+ Nuevo reporte** (modal para elegir caso) y **PDF** por fila. |
+| `/helpdesk/reportes/:id` | `ReporteDetalle.tsx` | `helpdesk.reportes.ver` | Documento en pantalla (membrete + logo) con botones **Descargar PDF** y **Ver caso**. |
 
 ### Permisos (seed automático)
 | Código | Módulo | Descripción |
@@ -464,6 +469,8 @@ La migración `16_helpdesk_schema.sql` incluye:
 | `helpdesk.gestionar` | Helpdesk | Crear/editar recursos y mantenimientos |
 | `helpdesk.casos.ver` | Helpdesk | Ver casos de soporte |
 | `helpdesk.casos.gestionar` | Helpdesk | Crear/editar/cerrar casos de soporte |
+| `helpdesk.reportes.ver` | Helpdesk | Ver reportes de casos |
+| `helpdesk.reportes.gestionar` | Helpdesk | Crear reportes de casos |
 
 ### Flujo Detectar PC
 1. Técnico abre `/helpdesk/obtener-pc` (requiere cliente seleccionado en HelpdeskContext, si no hay muestra link para seleccionar)
@@ -498,6 +505,37 @@ La migración `16_helpdesk_schema.sql` incluye:
 - Pestaña "Todos los Recursos" en `HelpdeskNav` visible siempre que se tenga `helpdesk.ver`, sin depender de cliente seleccionado
 - **Backend**: los endpoints `listar`, `obtener` y `detectarPC` usan `LEFT JOIN` en lugar de `JOIN` para incluir recursos sin cliente (`cliente_id IS NULL`)
 
+### Módulo Reportes de casos (helpdesk)
+Cada caso puede tener 0..N reportes; cada reporte es un **documento consecutivo** que se ve en pantalla y se imprime como hoja con membrete.
+
+**Base de datos (repo `maxan-db`)**
+- `27_reportes_caso.sql` (migración **ya aplicada en `maxan_db_dev`**):
+  - Tabla `helpdesk.reportes_caso`: `id`, `"numeroReporte"` (UNIQUE), `"idCaso"` (FK a `helpdesk.casos` con `ON DELETE CASCADE`), `created_at` (fecha del documento).
+  - Sequence `helpdesk.reportes_caso_numero_seq` → `START 1000` (`RESTART WITH 1000` si hay que reiniciar), default de `"numeroReporte"`; sequence `reportes_caso_id_seq` también desde 1000.
+  - Índice `idx_reportes_caso_caso`.
+  - **Ojo**: los nombres en camelCase van **entrecomillados** en SQL (`"numeroReporte"`, `"idCaso"`).
+- `init/08_helpdesk.sql` actualizado (tabla + sequences + defaults + constraints + índice + FK) para instalaciones nuevas.
+- `seeds/01_permisos.sql` con ids **518** (`helpdesk.reportes.ver`) y **519** (`helpdesk.reportes.gestionar`).
+
+**Backend**
+- `routes/helpdesk/reportes.js` + `controllers/helpdesk/reportesController.js` (GET `/`, GET `/:id`, POST `/`); registrado en `src/index.js` como `/helpdesk/reportes`.
+- `seed/permisos.js` incluye los 2 permisos y los asigna: `ver` → Admin/Operador/Consultor, `gestionar` → Admin/Operador (se siembra solo al arrancar con nodemon).
+
+**Frontend**
+- `src/lib/reportes.ts` — tipos (`ReporteFila`, `ReporteDetalle`, `ReporteDocumentoData`, `ReporteRecurso`), `EMPRESA` (membrete hardcodeado: "Maxan Sistemas", "313 485 0115", "maxansistemas.com"), `fechaCorta/fechaLarga/fechaHora`, `logoPng()` (SVG→PNG en canvas) y `generarReportePdf()` con **jsPDF** (A4: membrete, título, grid de datos, secciones, paginación con footer).
+- `src/components/ReporteDocumento.tsx` — la hoja en pantalla es espejo del PDF (misma proporción, fuente `font-mono`).
+- `pages/helpdesk/Reportes.tsx` (listado) y `pages/helpdesk/ReporteDetalle.tsx` (documento + Descargar PDF + Ver caso).
+- En `pages/helpdesk/CasoDetalle.tsx` hay una sección **Reportes**: chips con los reportes del caso + botón **+ Generar reporte**.
+- Rutas en `App.tsx` con `permiso="helpdesk.reportes.ver"`; item **Reportes** en `components/HelpdeskLayoutSidebar.tsx`.
+- Logo: `frontend/public/logo-maxan.svg` (viewBox `0 0 1855.59 475.38` → ratio alto/ancho ≈ 0.2562, usarlo para calcular la altura del logo en el PDF).
+
+**Decisiones / estado**
+- Contenido del reporte = datos del caso (no hay campo de texto libre en la tabla).
+- PDF en el **frontend** con `jspdf@4.2.1` (no jsPDF autógrafo, ni backend).
+- `numeroReporte`: entero solo, sin prefijo, arranca en **1000**.
+- Pruebas de API hechas con JWT manual (`JWT_SECRET` default `maxan-erp-secret-dev`); reportes de prueba borrados y sequence reiniciada → el próximo usuario real obtiene 1000.
+- Verificar con `npx tsc -b` y `npm run build`. El ESLint del repo ya falla con errores preexistentes (`@typescript-eslint/no-explicit-any`, `react-hooks/set-state-in-effect`) — el código nuevo sigue ese estilo.
+
 ## Problemas resueltos (continuación)
 48. **Backup sin schema generales** — `SCHEMAS_TO_DROP` en `backup.js` no incluía `generales`, causando error al restaurar si la tabla `contactos` ya existía. Se agregó `"generales"` al array.
 49. **CasoDetalle null check** — `caso.cliente_id` podía ser null causando error TS. Se cambió a `caso?.cliente_id ?? null`.
@@ -517,3 +555,6 @@ La migración `16_helpdesk_schema.sql` incluye:
 63. **La compra no era la única vía para alimentar inventario** — se creó el módulo de **ingresos de inventario manual** para stock inicial, ajustes por conteo, devoluciones y productos preexistentes (regalo) sin pasar por compra/gasto. Migración `25_ingresos_inventario.sql`: `inventario.entradas.gasto_id` nullable + columnas `origen` (`inicial`/`ajuste`/`otro`) y `referencia`. Endpoints `GET /api/inventario/ingresos` y `POST /api/inventario/entradas` (multi-línea, `inventario.gestionar`). Frontend `IngresosInventario.tsx` (listado + Excel) y `NuevoIngresoInventario.tsx` (formulario multi-línea).
 64. **Costo 0 en ingreso de inventario (regalo/ajuste)** — la validación frontend `!l.costo_unitario` rechazaba el campo **vacío**, y como el placeholder era "0" el usuario creía que ya valía cero (caso típico: producto regalado o stock preexistente). Solución: en `NuevoIngresoInventario.tsx` el campo vacío se interpreta como **costo 0** (`costo_unitario: 0` al enviar) y solo se rechazan negativos/NaN; backend valida con `isNaN(Number(...)) || < 0` aceptando 0. El costo 0 impide que un regalo hinche `costo_adquisiciones` en `vw_utilidad_productos` (margen completo al vender).
 65. **`POST /api/inventario/consumir` sin permiso granular** — el router de inventario no aplicaba `authorize` en ningún endpoint (solo `authenticate` global del `apiRouter`). Se agregó `authorize("inventario.gestionar")` a `consumir` y al nuevo `entradas` en `routes/inventario.js`, siguiendo el patrón del resto del sistema.
+66. **Login loop SSO recurrente por backend ERP caído** — al agregar el módulo de imágenes (`src/services/imagenesService.js` → `@aws-sdk/client-s3`), el contenedor `maxan-erp-backend-dev` crasheaba al arrancar (`MODULE_NOT_FOUND`) porque su `node_modules` (volumen anónimo de la imagen, construida antes de agregar la dep) no tenía `@aws-sdk/client-s3`. Con el backend caído, `GET /api/auth/me` fallaba → `AuthContext.tsx` limpiaba el token y redirigía a auth → la cookie de auth seguía válida → auth devolvía un token nuevo → bucle infinito ERP↔auth. Solución: `npm install` de las deps en el contenedor + reconstruir la imagen con `docker compose -f docker-compose.dev.yml up -d --build --renew-anon-volumes erp-backend` (renueva el volumen anónimo). **Regla**: al agregar dependencias al backend en Docker hay que reconstruir la imagen (o `docker exec <contenedor> npm install <dep>`), sino el backend crashea y el SSO entra en loop.
+67. **Imágenes de productos no visibles (thumbnail roto)** — las URLs guardadas en `inventario.imagenes` usaban `R2_PUBLIC_URL` apuntando al **endpoint S3 API** (`https://<account>.r2.cloudflarestorage.com/maxan-erp`), que es privado y exige firma SigV4 → el `<img>` daba HTTP 400/403 y mostraba el ícono de imagen rota. Solución: (1) habilitar **acceso público** del bucket `maxan-erp` en Cloudflare (R2 → bucket → Configuración → Acceso público → `https://pub-<hash>.r2.dev`); (2) `R2_PUBLIC_URL=https://pub-<hash>.r2.dev` en `backend/.env` (sin el nombre del bucket en la ruta) + recrear el contenedor (env_file se lee al crear); (3) actualizar las URLs ya guardadas con `UPDATE inventario.imagenes SET url = regexp_replace(url, '^https://<account>\.r2\.cloudflarestorage\.com/<bucket>/', 'https://pub-<hash>.r2.dev/')`. La tienda también consume estas URLs (`imagenPrincipal`), queda arreglada con el mismo cambio.
+68. **"No tienes permiso" al generar reporte siendo Administrador** — el botón aparece porque `hasPermiso` en `AuthContext.tsx` devuelve `true` para el rol Administrador sin consultar la lista de permisos, pero el backend valida `req.user.permisos` del **JWT emitido al hacer login** (los permisos van dentro del token; `/auth/me` solo re-emite los del token). Si el token es anterior a la creación del permiso → 403. Solución: **cerrar sesión y volver a entrar** (reiniciar servidores no actualiza el token; `JWT_EXPIRES_IN` = 8h). Vale para cualquier permiso nuevo.

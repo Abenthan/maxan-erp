@@ -30,6 +30,7 @@ const helpdeskMantenimientosRouter = require("./routes/helpdesk/mantenimientos")
 const helpdeskDetallesRouter = require("./routes/helpdesk/detalles");
 const helpdeskCategoriasRouter = require("./routes/helpdesk/categorias");
 const helpdeskCasosRouter = require("./routes/helpdesk/casos");
+const helpdeskReportesRouter = require("./routes/helpdesk/reportes");
 const generalesContactosRouter = require("./routes/generales/contactos");
 const helpdeskContactosRouter = require("./routes/helpdesk/contactos");
 const helpdeskCategoriasCasoRouter = require("./routes/helpdesk/categoriasCaso");
@@ -89,6 +90,7 @@ apiRouter.use("/helpdesk/mantenimientos", helpdeskMantenimientosRouter);
 apiRouter.use("/helpdesk/detalles", helpdeskDetallesRouter);
 apiRouter.use("/helpdesk/categorias-mantenimiento", helpdeskCategoriasRouter);
 apiRouter.use("/helpdesk/casos", helpdeskCasosRouter);
+apiRouter.use("/helpdesk/reportes", helpdeskReportesRouter);
 apiRouter.use("/generales/contactos", generalesContactosRouter);
 apiRouter.use("/helpdesk/contactos", helpdeskContactosRouter);
 apiRouter.use("/helpdesk/categorias-caso", helpdeskCategoriasCasoRouter);

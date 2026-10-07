@@ -7,6 +7,7 @@ const SIDEBAR_ITEMS = [
   { to: "/helpdesk", label: "Inicio", icon: "🏠", end: true, permiso: "" },
   { to: "/helpdesk/recursos", label: "Recursos", icon: "🖥️", permiso: "helpdesk.ver" },
   { to: "/helpdesk/casos", label: "Casos", icon: "📋", permiso: "helpdesk.casos.ver" },
+  { to: "/helpdesk/reportes", label: "Reportes", icon: "📄", permiso: "helpdesk.reportes.ver" },
   { to: "/helpdesk/mantenimientos", label: "Mantenimientos", icon: "🔧", permiso: "helpdesk.ver" },
 ];
 
