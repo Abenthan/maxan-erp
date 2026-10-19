@@ -53,6 +53,16 @@ const modulos = [
     ruta: "/bases-de-datos/terceros",
   },
   {
+    id: "tienda",
+    titulo: "Tienda",
+    desc: "Precios y visibilidad de los productos publicados en la tienda online",
+    icono: "🛒",
+    gradient: "from-fuchsia-500 to-fuchsia-600",
+    bgLight: "bg-fuchsia-50",
+    textColor: "text-fuchsia-700",
+    ruta: "/gestionTienda",
+  },
+  {
     id: "configuracion",
     titulo: "Configuración",
     desc: "Usuarios, roles, permisos y copia de seguridad",

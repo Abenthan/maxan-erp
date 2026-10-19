@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes, Link, useLocation } from "react-router-dom";
 import Layout from "./components/Layout";
 import InventarioLayout from "./components/InventarioLayout";
+import TiendaLayout from "./components/TiendaLayout";
 import HelpdeskLayout from "./components/HelpdeskLayout";
 import HelpdeskLayoutSidebar from "./components/HelpdeskLayoutSidebar";
 import BasesDeDatosLayout from "./components/BasesDeDatosLayout";
@@ -13,6 +14,9 @@ import Facturas from "./pages/Facturas";
 import Factura from "./pages/Factura";
 import NuevaFactura from "./pages/NuevaFactura";
 import Productos from "./pages/Productos";
+import ProductoDetalleInventario from "./pages/ProductoDetalleInventario";
+import GestionTienda from "./pages/GestionTienda";
+import EditarProductoTienda from "./pages/EditarProductoTienda";
 import Gastos from "./pages/Gastos";
 import Compras from "./pages/Compras";
 import NuevaCompra from "./pages/NuevaCompra";
@@ -95,6 +99,7 @@ function InventarioRoutes() {
     <InventarioLayout>
       <Routes>
         <Route path="productos" element={<ProtectedRoute permiso="productos.ver"><Productos /></ProtectedRoute>} />
+        <Route path="productos/:id" element={<ProtectedRoute permiso="productos.ver"><ProductoDetalleInventario /></ProtectedRoute>} />
         <Route path="nuevo-producto" element={<ProtectedRoute permiso="productos.gestionar"><NuevoProducto /></ProtectedRoute>} />
         <Route path="stock" element={<ProtectedRoute permiso="inventario.ver"><Inventario /></ProtectedRoute>} />
         <Route path="movimientos" element={<ProtectedRoute permiso="inventario.ver"><MovimientosInventario /></ProtectedRoute>} />
@@ -102,6 +107,17 @@ function InventarioRoutes() {
         <Route path="ingresos/nuevo" element={<ProtectedRoute permiso="inventario.gestionar"><NuevoIngresoInventario /></ProtectedRoute>} />
       </Routes>
     </InventarioLayout>
+  );
+}
+
+function TiendaRoutes() {
+  return (
+    <TiendaLayout>
+      <Routes>
+        <Route index element={<ProtectedRoute permiso="tienda.gestionar"><GestionTienda /></ProtectedRoute>} />
+        <Route path="editarProducto/:id" element={<ProtectedRoute permiso="tienda.gestionar"><EditarProductoTienda /></ProtectedRoute>} />
+      </Routes>
+    </TiendaLayout>
   );
 }
 
@@ -227,6 +243,7 @@ function App() {
             <Route path="/" element={<ProtectedRoute><Inicio /></ProtectedRoute>} />
             <Route path="/financiero/*" element={<FinancieroRoutes />} />
             <Route path="/inventario/*" element={<InventarioRoutes />} />
+            <Route path="/gestionTienda/*" element={<TiendaRoutes />} />
             <Route path="/helpdesk/*" element={<HelpdeskProvider><HelpdeskRoutes /></HelpdeskProvider>} />
             <Route path="/configuracion/*" element={<HelpdeskProvider><ConfiguracionRoutes /></HelpdeskProvider>} />
             <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />

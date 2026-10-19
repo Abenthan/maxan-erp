@@ -63,6 +63,16 @@ Sistema de facturación electrónica colombiano para DIAN (UBL 2.1).
 | `POST` | `/api/helpdesk/tipos-recurso` | `helpdesk.gestionar` | Crear tipo de recurso |
 | `DELETE` | `/api/helpdesk/tipos-recurso/:id` | `helpdesk.gestionar` | Eliminar tipo de recurso |
 
+### Tienda
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/tienda/productos-venta` | `tienda.gestionar` | Listar productos publicados en la tienda (join con inventario) |
+| `GET` | `/api/tienda/productos-venta/:id` | `tienda.gestionar` | Obtener registro por `producto_id` |
+| `GET` | `/api/tienda/productos-disponibles` | `tienda.gestionar` | Productos de inventario **sin** registro en tienda (filtro `?q=`) |
+| `POST` | `/api/tienda/productos-venta` | `tienda.gestionar` | Publicar producto (`producto_id`, `precio`); 409 si ya existe |
+| `PUT` | `/api/tienda/productos-venta/:id` | `tienda.gestionar` | Actualizar precio/activo/destacado/descripción |
+| `DELETE` | `/api/tienda/productos-venta/:id` | `usuarios.gestionar` | Quitar de la tienda (solo admin; no afecta inventario) |
+
 ## Desarrollo
 
 ```bash
@@ -111,6 +121,9 @@ npm run dev
 | `/register` | Registro primer usuario (solo si no hay usuarios) |
 | `/usuarios` | Gestionar usuarios (solo admin) |
 | `/roles` | Gestionar roles y permisos (solo admin) |
+| `/gestionTienda` | Productos publicados en la tienda (código, nombre, precio, activo) + modal "Nuevo registro" |
+| `/gestionTienda/editarProducto/:id` | Editar datos de venta (precio/activo/destacado/descripción), ver producto de inventario y eliminar (admin) |
+| `/inventario/productos/:id` | Detalle editable de un producto de inventario + imágenes |
 
 ## Estructura del proyecto
 
@@ -133,6 +146,7 @@ maxan-erp/
 │   │   │   ├── authController.js
 │   │   │   ├── usuariosController.js
 │   │   │   ├── rolesController.js
+│   │   │   ├── tiendaController.js       # Publicaciones ERP → tienda.*
 │   │   │   └── helpdesk/
 │   │   │       ├── recursosController.js      # CRUD recursos + detectar PC
 │   │   │       ├── mantenimientosController.js
@@ -153,6 +167,7 @@ maxan-erp/
 │   │   │   ├── auth.js
 │   │   │   ├── usuarios.js
 │   │   │   ├── roles.js
+│   │   │   ├── tienda.js                     # /api/tienda/*
 │   │   │   └── helpdesk/
 │   │   │       ├── recursos.js               # Rutas recursos + detectar PC
 │   │   │       ├── mantenimientos.js
@@ -177,6 +192,9 @@ maxan-erp/
 │   │   │   ├── VentasItems.tsx
 │   │   │   ├── NuevaVenta.tsx
 │   │   │   ├── Productos.tsx
+│   │   │   ├── ProductoDetalleInventario.tsx
+│   │   │   ├── GestionTienda.tsx
+│   │   │   ├── EditarProductoTienda.tsx
 │   │   │   ├── Inventario.tsx
 │   │   │   ├── Gastos.tsx
 │   │   │   ├── GastosPorVentaItem.tsx
@@ -203,6 +221,7 @@ maxan-erp/
 │   │   │       └── RegistrarPC.tsx     # Detectar PC (script + revisar + manual)
 │   │   ├── components/
 │   │   │   ├── ProtectedRoute.tsx      # Ruta protegida por auth/permiso
+│   │   │   ├── TiendaLayout.tsx
 │   │   │   └── HelpdeskLayout.tsx
 │   │   ├── context/
 │   │   │   ├── ApiContext.tsx          # API methods (get, post, put, patch, del, upload)
