@@ -24,6 +24,7 @@ const permisosPorDefecto = [
   { codigo: "helpdesk.casos.gestionar", nombre: "Crear/editar/cerrar casos de soporte", modulo: "Helpdesk" },
   { codigo: "helpdesk.reportes.ver", nombre: "Ver reportes de casos", modulo: "Helpdesk" },
   { codigo: "helpdesk.reportes.gestionar", nombre: "Crear reportes de casos", modulo: "Helpdesk" },
+  { codigo: "tienda.gestionar", nombre: "Gestionar productos de la tienda", modulo: "Tienda" },
 ];
 
 async function seedPermisos(pool) {
